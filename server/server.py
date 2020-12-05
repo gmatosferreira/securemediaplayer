@@ -25,14 +25,25 @@ CATALOG = { '898a08080d1840793122b7e118b27a95d117ebce':
         }
 
 CATALOG_BASE = 'catalog'
-CHUNK_SIZE = 1024 * 4
+CHUNK_SIZE = 1024 * 4  #block
 
 class MediaServer(resource.Resource):
     isLeaf = True
 
     # Send the list of media files to clients
-    def do_list(self, request):
+    
+    def do_get_protocols(self, request):
+        protocols = {'cipher': ['AES','3DEs'], 
+                    'digests': ['SHA5120', 'BLAKE2'], 
+                    'cipher_mode': ['CBC', 'OFB']  
+                    }
+        
+        request.responseHeaders.addRawHeader(b"content-type", b"application/json")
+        return json.dumps({'error': 'unknown'}, indent=4).encode('latin')
 
+        
+    def do_list(self, request):
+_
         #auth = request.getHeader('Authorization')
         #if not auth:
         #    request.setResponseCode(401)
@@ -53,6 +64,7 @@ class MediaServer(resource.Resource):
 
         # Return list to client
         request.responseHeaders.addRawHeader(b"content-type", b"application/json")
+        
         return json.dumps(media_list, indent=4).encode('latin')
 
 
@@ -133,6 +145,7 @@ class MediaServer(resource.Resource):
                 return self.do_list(request)
 
             elif request.path == b'/api/download':
+                print("OK")
                 return self.do_download(request)
             else:
                 request.responseHeaders.addRawHeader(b"content-type", b'text/plain')
