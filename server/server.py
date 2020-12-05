@@ -13,6 +13,12 @@ FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
 logging.basicConfig(format=FORMAT)
 logger.setLevel(logging.DEBUG)
 
+PROTOCOLS = {
+    'cipher': ['AES', '3DES'],
+    'digests': ['SHA512', 'BLAKE2']
+    'modes': ['CBC', 'OFB']
+}
+
 CATALOG = { '898a08080d1840793122b7e118b27a95d117ebce': 
             {
                 'name': 'Sunny Afternoon - Upbeat Ukulele Background Music',
@@ -29,6 +35,13 @@ CHUNK_SIZE = 1024 * 4  #block
 
 class MediaServer(resource.Resource):
     isLeaf = True
+
+    # Send the list of available protocols
+    def do_get_protocols(self, request):
+
+        # Return list to client
+        request.responseHeaders.addRawHeader(b"content-type", b"application/json")
+        return json.dumps(PROTOCOLS, indent=4).encode('latin')
 
     # Send the list of media files to clients
     
