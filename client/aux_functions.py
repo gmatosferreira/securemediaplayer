@@ -1,3 +1,6 @@
+import requests
+import logging
+
 
 def client_chosen_options(server_url, requests):
     req = requests.get(f'{server_url}/api/protocols')    
@@ -8,8 +11,6 @@ def client_chosen_options(server_url, requests):
     protocols = req.json()
     
     print(protocols)
-    
-    
     while True:
         print("Choose a cipher algorithm: ")
         i=1
@@ -57,5 +58,16 @@ def client_chosen_options(server_url, requests):
     inputs_list = {'cipher': cipher, 'digest': digest, 'cipher_mode':cipher_mode}
     
     return inputs_list
-  
+
+
+"""
+    Encodes and sends a message to server
+"""
+def send_to_server(data,server_url, requests):
+    if data == None or data == '':
+        print('Data is none or empty')
+    #logger.debug("Sending data to server: {}".format(message))
+
+    r = requests.post(f'{server_url}/api/suite', data= data)
+    resp = r.json()
     

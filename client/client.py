@@ -24,11 +24,14 @@ def main():
     print("Contacting Server")
     
     # TODO: Secure the session
+    #isto é.. concorrênia?
     
     
     #options chosen
     input_list = client_chosen_options(SERVER_URL, requests)
-
+    
+    # post not working 
+    #send_to_server(input_list,SERVER_URL, requests )
 
     req = requests.get(f'{SERVER_URL}/api/list')
     if req.status_code == 200:
