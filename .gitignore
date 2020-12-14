@@ -2,3 +2,5 @@
 !abc.pdf
 /venv
 
+
+*.pyc
