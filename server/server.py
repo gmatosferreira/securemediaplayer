@@ -36,7 +36,7 @@ class MediaServer(resource.Resource):
 
     # Send the list of media files to clients
     
-    def do_protocols(self, request):
+    def do_choose_protocols(self, request):
         protocols = {'cipher': ['AES','3DEs'], 
                     'digests': ['SHA5120', 'BLAKE2'], 
                     'cipher_mode': ['CBC', 'OFB']  
@@ -140,7 +140,7 @@ class MediaServer(resource.Resource):
 
         try:
             if request.path == b'/api/protocols':
-                return self.do_protocols(request)
+                return self.do_choose_protocols(request)
             #elif request.uri == 'api/key':
             #...
             #elif request.uri == 'api/auth':
@@ -149,6 +149,7 @@ class MediaServer(resource.Resource):
                 return self.do_list(request)
 
             elif request.path == b'/api/download':
+                print("OK")
                 return self.do_download(request)
             else:
                 request.responseHeaders.addRawHeader(b"content-type", b'text/plain')
@@ -159,12 +160,26 @@ class MediaServer(resource.Resource):
             request.setResponseCode(500)
             request.responseHeaders.addRawHeader(b"content-type", b"text/plain")
             return b''
-    
+        
+    def testar(self,request):
+        data = request.args.get(b'id', "cipher" )
+        if data == None or data == '':
+            print('Data is none or empty')
+        print(request.args) 
+       
+        
     # Handle a POST request
     def render_POST(self, request):
         logger.debug(f'Received POST for {request.uri}')
-        request.setResponseCode(501)
-        return b''
+        try:
+            if request.path == b'/api/suite':
+                return self.testar(request)
+
+        except Exception as e:
+            logger.exception(e)
+            request.setResponseCode(501)
+            request.responseHeaders.addRawHeader(b"content-type", b"text/plain")
+            return b''
 
 
 print("Server started")

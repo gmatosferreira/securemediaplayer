@@ -72,18 +72,3 @@ def client_chosen_options(server_url):
     return cipherSuite
 
 
-"""
-    Encodes and sends a message to server
-"""
-def post_to_server(data, server_url):
-    # Validate data
-    if data == None or data == '':
-        print('Data is none or empty')
-    #logger.debug("Sending data to server: {}".format(message))
-
-    # Make request
-    r = requests.post(server_url, data = data)
-
-    # Return response
-    return r
-    
