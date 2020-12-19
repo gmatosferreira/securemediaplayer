@@ -178,8 +178,7 @@ class MediaServer(resource.Resource):
             DIGEST = request.args[b'digest'][0].decode('utf-8')
             CIPHER_MODE = request.args[b'cipher_mode'][0].decode('utf-8')
     
-    def process_data
-        
+
         
        
         
