@@ -1,6 +1,8 @@
 import requests
 import logging
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
 
 """
 This method asks the server for the available protocols
@@ -87,16 +89,73 @@ def create_digest(message, digst_algorithm):
         print("Digest Algorithm name not found! ")
     
     digest = hashes.Hash(hash_algorithm)
-
     digest.update(message)
+    
     return digest.finalize()
 
-    """[summary]
-    """
-def 
+"""
 
-
+"""
+def symetric_encryption( key,message, algorithm_name, cypher_mode, encode=True ):
     
+    # Encode key (to bytes)
+    key = str.encode(key)
+
+    # Define algorithm
+    algorithm = None
+    blockLength = 0
+    iv = None
+    #useIv = True
+
+    if algorithm_name == "AES":
+        algorithm = algorithms.AES(key)
+        # Divide by 8 because it returns size on bits and we want on bytes (8 bits)
+        blockLength = algorithms.AES.block_size // 8
+        
+    elif algorithm_name == "3DES":
+        algorithm = algorithms.TripleDES(key[:24])
+        blockLength = algorithm.block_size // 8
+        
+    else:
+        raise Exception("Algorithm not found!")
+
+
+    print(f"# Going to work with {algorithm.name} algorithm")
+    print("# Block size will be", blockLength)
+
+    # Generate initialization vector
+    if encode and  iv == None:
+        iv = os.urandom(blockLength)
+
+    # Initialize Cipher with user chosen algorithm and Cipher Block Chaining mode
+    if cypher_mode == "CBC":
+        cipher = Cipher(algorithm, modes.CBC(iv))
+    elif cypher_mode == "OFB":
+        cipher = Cipher(algorithm,  modes.OFB(iv))
+    else:
+        raise Exception("Cypher mode not found!")
+
+
+    # Get encryptor for initialized cipher
+    if encode:
+        cryptor = cipher.encryptor()
+    else:
+        cryptor = cipher.decryptor()
+
+    if encode:
+        padding_length = blockLength - len(data)
+        padding = [padding_length] * (padding_length)
+        criptograma = cryptor.update(data + bytes(padding)) + cryptor.finalize()
+
+    if encode:
+        print(f"{source} has been sucessfully encripted to {destination}!")
+    else:
+        print(f"{source} has been sucessfully decripted to {destination}!")
+    
+    return criptograma
+
+
+        
     
         
 
