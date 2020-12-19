@@ -71,10 +71,12 @@ def client_chosen_options(server_url):
     
     return cipherSuite
 
-    """
-       
-    """
-def digest(message, digst_algorithm):
+
+"""
+This method checks and applys a digest function to a given message
+return: message with diggest
+"""
+def create_digest(message, digst_algorithm):
     hash_algorithm = None
     
     if digst_algorithm == "SHA512":
@@ -88,6 +90,12 @@ def digest(message, digst_algorithm):
 
     digest.update(message)
     return digest.finalize()
+
+    """[summary]
+    """
+def 
+
+
     
     
         
