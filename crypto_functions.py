@@ -2,6 +2,8 @@ import requests
 import logging
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization, hashes, hmac
 
 
 """
@@ -86,12 +88,28 @@ def create_digest(message, digst_algorithm):
     elif digst_algorithm == "BLAKE2":
         hash_algorithm = hashes.BLAKE2b(64)
     else:
-        print("Digest Algorithm name not found! ")
+        print("Digest Algorithm name not founded! ")
     
     digest = hashes.Hash(hash_algorithm)
     digest.update(message)
     
     return digest.finalize()
+
+def create_mac(message, key, digst_algorithm):
+    
+    hash_algorithm = None
+
+    if digst_algorithm == "SHA512":
+        hash_algorithm = hashes.SHA512()
+    elif algorithm == "BLAKE2":
+        digst_algorithm = hashes.BLAKE2b(64)
+    else:
+        raise Exception("Digest Algorithm name not founded!")
+
+    mac = hmac.HMAC(key, digst_algorithm, backend=default_backend())
+    mac.update(message)
+    
+    return mac.finalize()
 
 """
 
