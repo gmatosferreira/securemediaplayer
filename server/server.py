@@ -8,12 +8,23 @@ import json
 import os
 import math
 
+# Serialization
+from cryptography.hazmat.primitives import serialization
+
+# Diffie-hellman
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import dh
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
+import sys
+sys.path.append('..')
+
+from crypto_functions import *
+
 logger = logging.getLogger('root')
 FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
 logging.basicConfig(format=FORMAT)
 logger.setLevel(logging.DEBUG)
-
-
 
 CATALOG = { '898a08080d1840793122b7e118b27a95d117ebce': 
             {
@@ -32,10 +43,29 @@ CHUNK_SIZE = 1024 * 4  #block
 class MediaServer(resource.Resource):
     isLeaf = True
 
+    # Constructor
+    def __init__(self):
+        print("Initializing server...")
+        # Create the private/public keys pais
+        self.private_key, self.public_key = CryptoFunctions.newKeys()
+        print("\nUsing parameters\n", CryptoFunctions.parameters)
+        
+        print("\nPrivate key created!\n", self.private_key)
+        print(self.private_key.private_bytes(
+            encoding = serialization.Encoding.PEM,
+            format = serialization.PrivateFormat.PKCS8,
+            encryption_algorithm = serialization.NoEncryption()
+        ))
+        print("\nPublic key generated!\n", self.public_key)
+        print(self.public_key.public_bytes(
+            encoding = serialization.Encoding.PEM,
+            format = serialization.PublicFormat.SubjectPublicKeyInfo
+        ))
+
+
     # Send the list of available protocols
 
     # Send the list of media files to clients
-    
     def do_choose_protocols(self, request):
         protocols = {'cipher': ['AES','3DEs'], 
                     'digests': ['SHA5120', 'BLAKE2'], 
@@ -45,7 +75,20 @@ class MediaServer(resource.Resource):
         request.responseHeaders.addRawHeader(b"content-type", b"application/json")
         return json.dumps(protocols).encode('latin')
 
-        
+    # Send the server public key
+    def do_public_key(self, request):
+        request.responseHeaders.addRawHeader(b"content-type", b"application/json")
+        # Convert public key to bytes
+        pk = self.public_key.public_bytes(
+            encoding = serialization.Encoding.PEM,
+            format = serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+        print("\nSerialized public key to answer request!\n", pk)
+        # Return it
+        return json.dumps({
+            'public_key': pk.decode('utf-8')
+        }).encode('latin')
+
     def do_list(self, request):
 
         #auth = request.getHeader('Authorization')
@@ -136,11 +179,13 @@ class MediaServer(resource.Resource):
 
     # Handle a GET request
     def render_GET(self, request):
-        logger.debug(f'Received request for {request.uri}')
+        logger.debug(f'\nReceived request for {request.uri}')
 
         try:
             if request.path == b'/api/protocols':
                 return self.do_choose_protocols(request)
+            elif request.path == b'/api/publickey':
+                return self.do_public_key(request)
             #elif request.uri == 'api/key':
             #...
             #elif request.uri == 'api/auth':
@@ -161,19 +206,74 @@ class MediaServer(resource.Resource):
             request.responseHeaders.addRawHeader(b"content-type", b"text/plain")
             return b''
         
+    # POST REQUESTS
     def testar(self,request):
         data = request.args.get(b'id', "cipher" )
         if data == None or data == '':
             print('Data is none or empty')
         print(request.args) 
+
+    """
+    This method negociates the encription keys to use 
+    in the communications with the client.
+
+    1. Receive a POST request from the client, with
+      - The client shared key
+      - The client public key
+    2. Compute the server shared key, based on 
+      - The server private key
+      - The client public key
+    3. Validate that the client and the server shared key are the same
+    4. TODO Compute the encription key, based on:
+      - The client shared key
+      - The server private key
+    5. As an answer to this request, the server will return:
+      - The shared key
+    """
+    def diffieHellman(self,request):
+        data = request.args.get(b'id', "cipher" )
+        if data == None or data == '':
+            print('Data is none or empty')
+        print(request.args) 
+
+        # 1. Get the client shared key and public key
+        client_shared_key = request.args[b'shared_key'][0]
+        client_public_key = serialization.load_pem_public_key(request.args[b'public_key'][0])
+        print("\nGot the client shared key!\n", client_shared_key)
+        print("\nGot the client public key!\n", client_public_key)
+        print(client_public_key.public_bytes(
+            encoding = serialization.Encoding.PEM,
+            format = serialization.PublicFormat.SubjectPublicKeyInfo
+        ))
+
+        # 2. Compute the server shared key
+        shared_key = self.private_key.exchange(client_public_key)
+        print("\nComputed server shared key!\n", shared_key)
+
+        # 3. Validate that the client and the server shared key are the same
+        # TODO Error! Shared keys don't match...
+        if shared_key != client_shared_key:
+            print("ERROR! The client and server shared keys do not match!")
+            request.responseHeaders.addRawHeader(b"content-type", b"application/json")
+            return json.dumps({'error': 'The client and server shared keys do not match!'}, indent=4).encode('latin') 
+    
+        print("\nShared keys match!")
+
+        # 4./5. TODO From here
+
+        # ?. Return a successfull 
+        request.responseHeaders.addRawHeader(b"content-type", b"application/json")
+        return json.dumps({'shared_key': shared_key}, indent=4).encode('latin') 
        
         
     # Handle a POST request
     def render_POST(self, request):
-        logger.debug(f'Received POST for {request.uri}')
+        logger.debug(f'\nReceived POST for {request.uri}')
         try:
             if request.path == b'/api/suite':
                 return self.testar(request)
+            elif request.path == b'/api/keyNegociation':
+                return self.diffieHellman(request)
 
         except Exception as e:
             logger.exception(e)

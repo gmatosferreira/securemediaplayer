@@ -7,6 +7,20 @@ import subprocess
 import time
 import sys
 from aux_functions import *
+
+# Serialization
+from cryptography.hazmat.primitives import serialization
+
+# Diffie-hellman
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import dh
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
+import sys
+sys.path.append('..')
+
+from crypto_functions import *
+
 logger = logging.getLogger('root')
 FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
 logging.basicConfig(format=FORMAT)
@@ -14,11 +28,36 @@ logger.setLevel(logging.INFO)
 
 SERVER_URL = 'http://127.0.0.1:8080'
 
+# Client variables
+PRIVKEY = None
+PUBLICKEY = None
+CIPHER = None
+DIGEST = None
+CIPHERMODE = None
+
     
 def main():
     print("|--------------------------------------|")
     print("|         SECURE MEDIA CLIENT          |")
     print("|--------------------------------------|\n")
+
+    # Define the client private and public keys
+    print("Initializing client...")
+    # Create the private/public keys pais
+    PRIVKEY, PUBLICKEY = CryptoFunctions.newKeys()
+    print("\nUsing parameters\n", CryptoFunctions.parameters)
+
+    print("\nPrivate key created!\n", PRIVKEY)
+    print(PRIVKEY.private_bytes(
+        encoding = serialization.Encoding.PEM,
+        format = serialization.PrivateFormat.PKCS8,
+        encryption_algorithm = serialization.NoEncryption()
+    ))
+    print("\nPublic key generated!\n", PUBLICKEY)
+    print(PUBLICKEY.public_bytes(
+        encoding = serialization.Encoding.PEM,
+        format = serialization.PublicFormat.SubjectPublicKeyInfo
+    ))
 
     # Get a list of media files
     print("Contacting Server")
@@ -27,14 +66,14 @@ def main():
     #isto é.. concorrênia?
     
     
-    #options chosen
+    # 1. Let user choose chipher suite
     cipherSuite = client_chosen_options(SERVER_URL)
-    r = requests.post(f'{SERVER_URL}/api/suite', data = cipherSuite)
+    CIPHER, DIGEST, CIPHERMODE = cipherSuite['cipher'], cipherSuite['digest'], cipherSuite['cipher_mode']
+    requests.post(f'{SERVER_URL}/api/suite', data = cipherSuite)
+    print(f"\nCipher suite defined!\nCipher: {CIPHER}; DIGEST: {DIGEST}; CIPHERMODE: {CIPHERMODE}")
 
-
-
-
-
+    # 2. Negociate encription keys (Diffie-Hellman)
+    diffieHellman(SERVER_URL, PRIVKEY, PUBLICKEY)
 
     req = requests.get(f'{SERVER_URL}/api/list')
     if req.status_code == 200:
@@ -42,10 +81,6 @@ def main():
     
     media_list = req.json()
     print(media_list)
-    
-    
-    
-    
     
     # Present a simple selection menu    
     idx = 0
