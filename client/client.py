@@ -6,7 +6,8 @@ import os
 import subprocess
 import time
 import sys
-from aux_functions import *
+from .. import crypto_functions
+
 logger = logging.getLogger('root')
 FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
 logging.basicConfig(format=FORMAT)

@@ -1,6 +1,6 @@
 import requests
 import logging
-
+from cryptography.hazmat.primitives import hashes
 
 """
 This method asks the server for the available protocols
@@ -71,4 +71,25 @@ def client_chosen_options(server_url):
     
     return cipherSuite
 
+    """
+       
+    """
+def digest(message, digst_algorithm):
+    hash_algorithm = None
+    
+    if digst_algorithm == "SHA512":
+        hash_algorithm = hashes.SHA512()
+    elif digst_algorithm == "BLAKE2":
+        hash_algorithm = hashes.BLAKE2b(64)
+    else:
+        print("Digest Algorithm name not found! ")
+    
+    digest = hashes.Hash(hash_algorithm)
 
+    digest.update(message)
+    return digest.finalize()
+    
+    
+        
+
+    

@@ -43,7 +43,7 @@ class MediaServer(resource.Resource):
     
     def do_choose_protocols(self, request): 
         protocols = {'cipher': ['AES','3DEs'], 
-                    'digests': ['SHA5120', 'BLAKE2'], 
+                    'digests': ['SHA512', 'BLAKE2'], 
                     'cipher_mode': ['CBC', 'OFB']  
                     }
         
@@ -177,6 +177,8 @@ class MediaServer(resource.Resource):
             CIPHER = request.args[b'cipher'][0].decode('utf-8')
             DIGEST = request.args[b'digest'][0].decode('utf-8')
             CIPHER_MODE = request.args[b'cipher_mode'][0].decode('utf-8')
+    
+    def process_data
         
         
        
