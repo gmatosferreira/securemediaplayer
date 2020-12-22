@@ -221,3 +221,33 @@ class CryptoFunctions:
             print(f"{source} has been sucessfully decripted to {destination}!")
         
         return criptograma
+
+    @staticmethod
+    def signingRSA(message, private_key):
+        signature = private_key.sign(
+            message,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256(),
+        )
+        return signature
+
+    @staticmethod
+    def validacaoAssinatura_RSA(signature, message, public_key):
+        try:
+            public_key.verify(
+                signature,
+                message,
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256(),
+            )
+        except:
+            print("erro ao verificar a assinatura")
+            return False
+
+        return True
+
+
