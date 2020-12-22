@@ -111,6 +111,8 @@ def create_mac(message, key, digst_algorithm):
     
     return mac.finalize()
 
+
+
 """
 
 """
@@ -171,6 +173,35 @@ def symetric_encryption( key,message, algorithm_name, cypher_mode, encode=True )
         print(f"{source} has been sucessfully decripted to {destination}!")
     
     return criptograma
+
+def signingRSA(message, private_key):
+    signature = private_key.sign(
+        message,
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256(),
+    )
+    return signature
+
+def validacaoAssinatura_RSA(signature, message, public_key):
+    try:
+        public_key.verify(
+            signature,
+            message,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256(),
+        )
+    except:
+        pritn("erro ao verificar a assinatura")
+        return False
+
+    return True
+
+
+
 
 
         
