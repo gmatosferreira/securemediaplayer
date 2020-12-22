@@ -5,8 +5,14 @@ import json
 import os
 import subprocess
 import time
+
 import sys
-from aux_functions import *
+import os
+
+sys.path.append('..')
+from crypto_functions import * 
+
+
 logger = logging.getLogger('root')
 FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
 logging.basicConfig(format=FORMAT)

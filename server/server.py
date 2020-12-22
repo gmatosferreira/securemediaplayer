@@ -14,6 +14,11 @@ logging.basicConfig(format=FORMAT)
 logger.setLevel(logging.DEBUG)
 
 
+CIPHER = None
+DIGEST = None
+CIPHER_MODE= None
+KEY = None
+
 
 CATALOG = { '898a08080d1840793122b7e118b27a95d117ebce': 
             {
@@ -36,9 +41,9 @@ class MediaServer(resource.Resource):
 
     # Send the list of media files to clients
     
-    def do_choose_protocols(self, request):
+    def do_choose_protocols(self, request): 
         protocols = {'cipher': ['AES','3DEs'], 
-                    'digests': ['SHA5120', 'BLAKE2'], 
+                    'digests': ['SHA512', 'BLAKE2'], 
                     'cipher_mode': ['CBC', 'OFB']  
                     }
         
@@ -161,11 +166,20 @@ class MediaServer(resource.Resource):
             request.responseHeaders.addRawHeader(b"content-type", b"text/plain")
             return b''
         
-    def testar(self,request):
-        data = request.args.get(b'id', "cipher" )
+#----------------------------------------------------------------------------------------
+ 
+    def process_negotiation(self,request):
+        data = request.args.get(b'id', "digest" )
+        
         if data == None or data == '':
             print('Data is none or empty')
-        print(request.args) 
+        else:
+            CIPHER = request.args[b'cipher'][0].decode('utf-8')
+            DIGEST = request.args[b'digest'][0].decode('utf-8')
+            CIPHER_MODE = request.args[b'cipher_mode'][0].decode('utf-8')
+    
+
+        
        
         
     # Handle a POST request
@@ -173,8 +187,9 @@ class MediaServer(resource.Resource):
         logger.debug(f'Received POST for {request.uri}')
         try:
             if request.path == b'/api/suite':
-                return self.testar(request)
+                return self.process_negotiation(request)
 
+        
         except Exception as e:
             logger.exception(e)
             request.setResponseCode(501)
