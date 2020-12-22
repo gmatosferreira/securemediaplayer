@@ -212,8 +212,7 @@ class CryptoFunctions:
 
         if encode:
             for i in range(0,len(message),blockLength ):
-                finalIndex = i+blockLength-1 if len(message)>=i+blockLength else
-                data = message[i:i+finalIndex]
+                data = message[i:i+blockLength-1]
                 padding_length = blockLength - len(data)
                 padding = [padding_length] * (padding_length)
                 criptograma = cryptor.update(data + bytes(padding)) + cryptor.finalize()
