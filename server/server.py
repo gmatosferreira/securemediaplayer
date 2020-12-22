@@ -50,6 +50,11 @@ class MediaServer(resource.Resource):
         self.parameters = dh.generate_parameters(generator=2, key_size=2048)
         self.private_key, self.public_key = CryptoFunctions.newKeys(self.parameters)
         self.shared_key = None
+
+        self.CIPHER = None
+        self.DIGEST = None
+        self.CIPHER_MODE= None
+        self.KEY = None
         
         print("\nPrivate key created!\n", self.private_key)
         print(self.private_key.private_bytes(
@@ -68,7 +73,7 @@ class MediaServer(resource.Resource):
     # Send the list of media files to clients
     def do_choose_protocols(self, request):
         protocols = {'cipher': ['AES','3DEs'], 
-                    'digests': ['SHA5120', 'BLAKE2'], 
+                    'digests': ['SHA512', 'BLAKE2'], 
                     'cipher_mode': ['CBC', 'OFB']  
                     }
         
@@ -207,13 +212,6 @@ class MediaServer(resource.Resource):
             request.responseHeaders.addRawHeader(b"content-type", b"text/plain")
             return b''
         
-    # POST REQUESTS
-    def testar(self,request):
-        data = request.args.get(b'id', "cipher" )
-        if data == None or data == '':
-            print('Data is none or empty')
-        print(request.args) 
-
     """
     This method allows the client to send his public key
     and get the server's one, so that they both generate the 
@@ -241,23 +239,32 @@ class MediaServer(resource.Resource):
             format = serialization.PublicFormat.SubjectPublicKeyInfo
         )
         print("\nSerialized public key to answer request!\n", pk)
-        
-        # Return it
+ 
+        # 3.1. Return it
         return json.dumps({
             'public_key': pk.decode('utf-8'),
         }).encode('latin')
     
+    def process_negotiation(self,request):
+        data = request.args.get(b'id', "digest" )
+        
+        if data == None or data == '':
+            print('Data is none or empty')
+        else:
+            self.CIPHER = request.args[b'cipher'][0].decode('utf-8')
+            self.DIGEST = request.args[b'digest'][0].decode('utf-8')
+            self.CIPHER_MODE = request.args[b'cipher_mode'][0].decode('utf-8')
+        
     # Handle a POST request
     def render_POST(self, request):
         logger.debug(f'\nReceived POST for {request.uri}')
         try:
-            if request.path == b'/api/publickey':
+            if request.path == b'/api/suite':
+                return self.process_negotiation(request)
+            elif request.path == b'/api/publickey':
                 return self.do_public_key(request)
-            elif request.path == b'/api/suite':
-                return self.testar(request)
-            elif request.path == b'/api/keyNegociation':
-                return self.diffieHellman(request)
 
+        
         except Exception as e:
             logger.exception(e)
             request.setResponseCode(501)

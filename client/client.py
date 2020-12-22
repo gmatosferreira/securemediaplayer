@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import time
+
 import sys
 from aux_functions import *
 
@@ -19,8 +20,8 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 import sys
 sys.path.append('..')
 
-from crypto_functions import CryptoFunctions
 
+from crypto_functions import CryptoFunctions
 logger = logging.getLogger('root')
 FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
 logging.basicConfig(format=FORMAT)
