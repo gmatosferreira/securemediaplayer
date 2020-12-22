@@ -162,22 +162,31 @@ class CryptoFunctions:
         return mac.finalize()
 
     """
-
+    This method handles symetric encryption/decription
+    --- Parameters
+    key             String      The key to use on encription/decription
+    message         Bytes       The text to encrypt/crytpogram to decript
+    algorithm_name  String      AES or 3DES
+    cypher_mode     String      CBC or OFB
+    digest_mode     String      SHA512 or BLAKE2
+    encode          bool        True for encription and False for decription
+    --- Returns
+    criptograma     Bytes       Criptogram for encription and plain text for decription
     """
     @staticmethod
     def symetric_encryption(key,message, algorithm_name, cypher_mode, digest_mode, encode=True ):
 
         # If key length does not match expected, create digest for it
-        print(f"Symetric encription with key of size {len(key)*8}...")
+        print(f"\nSymetric encription with key of size {len(key)*8}...")
         if len(key)*8 != 256:
             key = CryptoFunctions.create_digest(key, digest_mode)
         print(f"Symetric encription with key of size {len(key)*8}...")
+        print("Message is:\n", message)
 
         # Define algorithm
         algorithm = None
         blockLength = 0
         iv = None
-        #useIv = True
 
         if algorithm_name == "AES":
             algorithm = algorithms.AES(key)
@@ -196,8 +205,12 @@ class CryptoFunctions:
         print("# Block size will be", blockLength)
 
         # Generate initialization vector
-        if encode and  iv == None:
+        if encode and iv == None:
             iv = os.urandom(blockLength)
+        # On decription, get IV
+        else:
+            iv = message[0:blockLength]
+            message = message[blockLength:]
 
         # Initialize Cipher with user chosen algorithm and Cipher Block Chaining mode
         if cypher_mode == "CBC":
@@ -207,24 +220,46 @@ class CryptoFunctions:
         else:
             raise Exception("Cypher mode not found!")
 
-
         # Get encryptor for initialized cipher
         if encode:
             cryptor = cipher.encryptor()
         else:
             cryptor = cipher.decryptor()
 
-        if encode:
-            for i in range(0,len(message),blockLength ):
-                data = message[i:i+blockLength-1].encode()
-                padding_length = blockLength - len(data)
-                padding = [padding_length] * (padding_length)
-                criptograma = cryptor.update(data + bytes(padding)) + cryptor.finalize()
+        criptograma = b""
 
+        # On encription, save IV at the beggining
         if encode:
-            print(f"{message} encripted to {criptograma}")
+            criptograma += iv
+
+        # Iterate over blocks
+        for i in range(0,len(message)+1,blockLength):
+            data = message[i:i+blockLength] if i < len(message) else b''
+            print(data, len(data))
+            # If data has block size, just encrypt
+            if len(data) == blockLength:
+                criptograma += cryptor.update(data)
+            # If smaller, reached end, add/remove padding and finalyze
+            else:
+                # On encription, save IV at the beggining
+                if encode:
+                    padding_length = blockLength - len(data)
+                    padding = [padding_length] * (padding_length)
+                    criptograma += cryptor.update(data + bytes(padding))
+    
+        # Add finalization on both modes
+        criptograma += cryptor.finalize()
+        print(f"Finished at index {i} to {i+blockLength-1}")
+
+        # If decripting, remove padding
+        if not encode:
+            print("Removing padding of ", criptograma[-1])
+            criptograma = criptograma[:-1*criptograma[-1]]
+            
+        if encode:
+            print(f"Encripted to\n{criptograma}")
         else:
-            print(f"{message} decripted to {criptograma}")
+            print(f"Decripted to\n{criptograma}")
         
         return criptograma
 
