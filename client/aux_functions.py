@@ -39,6 +39,7 @@ def client_chosen_options(server_url):
         exit()
    
     protocols = req.json()
+    print(protocols)
 
     # Cipher choice
     while True:
@@ -68,7 +69,7 @@ def client_chosen_options(server_url):
         print("> " , end =" ")
         op = int(input())
         if op >= 1 and op <= len(protocols['digests']):
-            cipher = protocols['digests'][op-1]
+            digest = protocols['digests'][op-1]
             break
         print("That is not a valid option! Try again!")
 

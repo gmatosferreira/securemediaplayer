@@ -171,13 +171,20 @@ class MediaServer(resource.Resource):
             data = f.read(CHUNK_SIZE)
 
             request.responseHeaders.addRawHeader(b"content-type", b"application/json")
-            return json.dumps(
+            return CryptoFunctions.symetric_encryption(
+                key = self.shared_key,
+                message = json.dumps(
                     {
                         'media_id': media_id, 
                         'chunk': chunk_id, 
                         'data': binascii.b2a_base64(data).decode('latin').strip()
                     },indent=4
-                ).encode('latin')
+                ),
+                algorithm_name = self.CIPHER,
+                cypher_mode = self.CIPHER_MODE,
+                digest_mode = self.DIGEST,
+                encode = True
+            ).encode('latin')
 
         # File was not open?
         request.responseHeaders.addRawHeader(b"content-type", b"application/json")
@@ -254,6 +261,7 @@ class MediaServer(resource.Resource):
             self.CIPHER = request.args[b'cipher'][0].decode('utf-8')
             self.DIGEST = request.args[b'digest'][0].decode('utf-8')
             self.CIPHER_MODE = request.args[b'cipher_mode'][0].decode('utf-8')
+            print(f"\n\nDefined chiper suite as:\nCipher: {self.CIPHER}\nDigest: {self.DIGEST}\nMode: {self.CIPHER_MODE}\n")
         
     # Handle a POST request
     def render_POST(self, request):

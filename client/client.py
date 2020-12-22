@@ -97,10 +97,6 @@ def main():
         print(f'{idx} - {media_list[idx]["name"]}')
     print("----")
 
-
-
-
-
     while True:
         selection = input("Select a media file number (q to quit): ")
         if selection.strip() == 'q':

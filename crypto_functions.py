@@ -125,6 +125,7 @@ class CryptoFunctions:
 
     """
     This method checks and applys a digest function to a given message
+    The default size is 256
     return: message with diggest
     """
     @staticmethod
@@ -132,9 +133,9 @@ class CryptoFunctions:
         hash_algorithm = None
         
         if digst_algorithm == "SHA512":
-            hash_algorithm = hashes.SHA512()
+            hash_algorithm = hashes.SHA512_256()
         elif digst_algorithm == "BLAKE2":
-            hash_algorithm = hashes.BLAKE2b(64)
+            hash_algorithm = hashes.BLAKE2b(256)
         else:
             print("Digest Algorithm name not founded! ")
         
@@ -164,10 +165,13 @@ class CryptoFunctions:
 
     """
     @staticmethod
-    def symetric_encryption(key,message, algorithm_name, cypher_mode, encode=True ):
-        
-        # Encode key (to bytes)
-        key = str.encode(key)
+    def symetric_encryption(key,message, algorithm_name, cypher_mode, digest_mode, encode=True ):
+
+        # If key length does not match expected, create digest for it
+        print(f"Symetric encription with key of size {len(key)*8}...")
+        if len(key)*8 != 256:
+            key = CryptoFunctions.create_digest(key, digest_mode)
+        print(f"Symetric encription with key of size {len(key)*8}...")
 
         # Define algorithm
         algorithm = None
@@ -212,15 +216,15 @@ class CryptoFunctions:
 
         if encode:
             for i in range(0,len(message),blockLength ):
-                data = message[i:i+blockLength-1]
+                data = message[i:i+blockLength-1].encode()
                 padding_length = blockLength - len(data)
                 padding = [padding_length] * (padding_length)
                 criptograma = cryptor.update(data + bytes(padding)) + cryptor.finalize()
 
         if encode:
-            print(f"{source} has been sucessfully encripted to {destination}!")
+            print(f"{message} encripted to {criptograma}")
         else:
-            print(f"{source} has been sucessfully decripted to {destination}!")
+            print(f"{message} decripted to {criptograma}")
         
         return criptograma
 
