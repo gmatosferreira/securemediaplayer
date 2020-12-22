@@ -211,9 +211,12 @@ class CryptoFunctions:
             cryptor = cipher.decryptor()
 
         if encode:
-            padding_length = blockLength - len(data)
-            padding = [padding_length] * (padding_length)
-            criptograma = cryptor.update(data + bytes(padding)) + cryptor.finalize()
+            for i in range(0,len(message),blockLength ):
+                finalIndex = i+blockLength-1 if len(message)>=i+blockLength else
+                data = message[i:i+finalIndex]
+                padding_length = blockLength - len(data)
+                padding = [padding_length] * (padding_length)
+                criptograma = cryptor.update(data + bytes(padding)) + cryptor.finalize()
 
         if encode:
             print(f"{source} has been sucessfully encripted to {destination}!")
