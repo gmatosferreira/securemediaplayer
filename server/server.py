@@ -214,6 +214,11 @@ class MediaServer(resource.Resource):
             print('Data is none or empty')
         print(request.args) 
 
+    """
+    This method allows the client to send his public key
+    and get the server's one, so that they both generate the 
+    session shared key (Diffie-Hellman) 
+    """
     def do_public_key(self, request):
         data = request.args.get(b'public_key')
         if data == None or data == '':
@@ -226,7 +231,11 @@ class MediaServer(resource.Resource):
         client_public_key = serialization.load_pem_public_key(request.args[b'public_key'][0])
         print("\nGot the client public key!\n", client_public_key)
 
-        # Convert public key to bytes
+        # 2. Diffie-Hellman | Generate shared key
+        self.shared_key = self.private_key.exchange(client_public_key)
+        print("\nGenerated the server shared key!\n", self.shared_key)
+
+        # 3. Convert public key to bytes
         pk = self.public_key.public_bytes(
             encoding = serialization.Encoding.PEM,
             format = serialization.PublicFormat.SubjectPublicKeyInfo
@@ -237,49 +246,7 @@ class MediaServer(resource.Resource):
         return json.dumps({
             'public_key': pk.decode('utf-8'),
         }).encode('latin')
-
-    """
-    This method negociates the encription keys to use 
-    in the communications with the client.
-
-    1. Receive a POST request from the client, with
-      - The client shared key
-      - The client public key
-    2. Compute the server shared key, based on 
-      - The server private key
-      - The client public key
-    3. Validate that the client and the server shared key are the same
-    4. TODO Compute the encription key, based on:
-      - The client shared key
-      - The server private key
-    5. As an answer to this request, the server will return:
-      - The shared key
-    """
-    def diffieHellman(self,request):
-        data = request.args.get(b'id', "cipher" )
-        if data == None or data == '':
-            print('Data is none or empty')
-        print(request.args) 
-
-        # 1. Get the client shared key and public key
-        shared_key_crypto = request.args[b'shared_key_crypto'][0]
-        client_public_key = serialization.load_pem_public_key(request.args[b'public_key'][0])
-        print("\nGot the shared key cryptogram!\n", shared_key_crypto)
-        print("\nGot the client public key!\n", client_public_key)
-        print(client_public_key.public_bytes(
-            encoding = serialization.Encoding.PEM,
-            format = serialization.PublicFormat.SubjectPublicKeyInfo
-        ))
-
-        # 2. Decript the shared key
-        self.shared_key = CryptoFunctions.assymetric_decryption(self.private_key, shared_key_crypto)
-        print("\nDecripted the shared key!\n", self.shared_key)
-
-        # 3. Return a successfull answer 
-        request.responseHeaders.addRawHeader(b"content-type", b"application/json")
-        return json.dumps({'success': True}, indent=4).encode('latin') 
-       
-        
+    
     # Handle a POST request
     def render_POST(self, request):
         logger.debug(f'\nReceived POST for {request.uri}')

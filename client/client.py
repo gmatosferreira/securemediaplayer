@@ -32,6 +32,8 @@ SERVER_URL = 'http://127.0.0.1:8080'
 PARAMETERS = None
 PRIVKEY = None
 PUBLICKEY = None
+SHAREDKEY = None
+
 CIPHER = None
 DIGEST = None
 CIPHERMODE = None
@@ -76,8 +78,10 @@ def main():
     print(f"\nCipher suite defined!\nCipher: {CIPHER}; DIGEST: {DIGEST}; CIPHERMODE: {CIPHERMODE}")
 
     # 2. Negociate encription keys (Diffie-Hellman)
-    diffieHellman(SERVER_URL, PRIVKEY, PUBLICKEY)
+    SHAREDKEY = diffieHellman(SERVER_URL, PRIVKEY, PUBLICKEY)
+    print("\nGenerated the client shared key!\n", SHAREDKEY)
 
+    # ?. Get media list from server
     req = requests.get(f'{SERVER_URL}/api/list')
     if req.status_code == 200:
         print("Got Server List")
@@ -85,7 +89,7 @@ def main():
     media_list = req.json()
     print(media_list)
     
-    # Present a simple selection menu    
+    # ?. Present a simple selection menu    
     idx = 0
     print("MEDIA CATALOG\n")
     for item in media_list:
