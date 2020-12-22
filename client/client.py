@@ -19,7 +19,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 import sys
 sys.path.append('..')
 
-from crypto_functions import *
+from crypto_functions import CryptoFunctions
 
 logger = logging.getLogger('root')
 FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
@@ -29,6 +29,7 @@ logger.setLevel(logging.INFO)
 SERVER_URL = 'http://127.0.0.1:8080'
 
 # Client variables
+PARAMETERS = None
 PRIVKEY = None
 PUBLICKEY = None
 CIPHER = None
@@ -44,8 +45,10 @@ def main():
     # Define the client private and public keys
     print("Initializing client...")
     # Create the private/public keys pais
-    PRIVKEY, PUBLICKEY = CryptoFunctions.newKeys()
-    print("\nUsing parameters\n", CryptoFunctions.parameters)
+    PARAMETERS = ask_server_parameters(SERVER_URL)
+    print("\nGot parameters\n", PARAMETERS)
+
+    PRIVKEY, PUBLICKEY = CryptoFunctions.newKeys(PARAMETERS)
 
     print("\nPrivate key created!\n", PRIVKEY)
     print(PRIVKEY.private_bytes(
