@@ -124,8 +124,18 @@ def main():
     # Get data from server and send it to the ffplay stdin through a pipe
     for chunk in range(media_item['chunks'] + 1):
         req = requests.get(f'{SERVER_URL}/api/download?id={media_item["id"]}&chunk={chunk}')
-        chunk = req.json()
-       
+        
+        chunk = CryptoFunctions.symetric_encryption(
+            key = SHAREDKEY,
+            message = req.content,
+            algorithm_name = CIPHER,
+            cypher_mode = CIPHERMODE,
+            digest_mode = DIGEST,
+            encode = False
+        )
+
+        chunk = json.loads(chunk.decode())
+               
         # TODO: Process chunk
 
         data = binascii.a2b_base64(chunk['data'].encode('latin'))

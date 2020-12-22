@@ -178,13 +178,13 @@ class MediaServer(resource.Resource):
                         'media_id': media_id, 
                         'chunk': chunk_id, 
                         'data': binascii.b2a_base64(data).decode('latin').strip()
-                    },indent=4
-                ),
+                    }
+                ).encode(),
                 algorithm_name = self.CIPHER,
                 cypher_mode = self.CIPHER_MODE,
                 digest_mode = self.DIGEST,
                 encode = True
-            ).encode('latin')
+            )
 
         # File was not open?
         request.responseHeaders.addRawHeader(b"content-type", b"application/json")
