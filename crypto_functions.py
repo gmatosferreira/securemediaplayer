@@ -297,7 +297,7 @@ class CryptoFunctions:
 
         return True
     
-    
+    """
     def license_exists(username):
         with open('licenses.txt') as licenses_file:
         licenseData = json.load(licenses_file)
@@ -332,9 +332,7 @@ class CryptoFunctions:
             
             
         else:
-            """
-                each user has a usage time of 1 hour and 10 number os views
-            """
+            # each user has a usage time of 1 hour and 10 number os views
             licenseData = {}
             licenseData['availableLicenses'].append({
                 'username': username,
@@ -345,7 +343,7 @@ class CryptoFunctions:
             
             with open('licenses.txt', 'w') as newLicense:
                 json.dump(licenseData, newLicense)
-            
+    """
             
 
         
