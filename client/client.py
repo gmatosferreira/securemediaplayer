@@ -45,9 +45,8 @@ def main():
     print("|         SECURE MEDIA CLIENT          |")
     print("|--------------------------------------|\n")
 
-    # Define the client private and public keys
+    # 1. Define the client private and public keys
     print("Initializing client...")
-    # Create the private/public keys pais
     PARAMETERS = ask_server_parameters(SERVER_URL)
     print("\nGot parameters\n", PARAMETERS)
 

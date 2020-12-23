@@ -68,18 +68,6 @@ class MediaServer(resource.Resource):
             format = serialization.PublicFormat.SubjectPublicKeyInfo
         ))
 
-    # Send the list of available protocols
-
-    # Send the list of media files to clients
-    def do_choose_protocols(self, request):
-        protocols = {'cipher': ['AES','3DEs'], 
-                    'digests': ['SHA512', 'BLAKE2'], 
-                    'cipher_mode': ['CBC', 'OFB']  
-                    }
-        
-        request.responseHeaders.addRawHeader(b"content-type", b"application/json")
-        return json.dumps(protocols).encode('latin')
-
     # Send the server public key
     def do_parameters(self, request):
         request.responseHeaders.addRawHeader(b"content-type", b"application/json")
@@ -95,6 +83,18 @@ class MediaServer(resource.Resource):
             'parameters': pr.decode('utf-8')
         }).encode('latin')
 
+    # Send the list of available protocols
+    def do_choose_protocols(self, request):
+        protocols = {'cipher': ['AES','3DEs'], 
+                    'digests': ['SHA512', 'BLAKE2'], 
+                    'cipher_mode': ['CBC', 'OFB']  
+                    }
+        
+        request.responseHeaders.addRawHeader(b"content-type", b"application/json")
+        return json.dumps(protocols).encode('latin')
+
+
+    # Send the list of media files to clients
     def do_list(self, request):
 
         #auth = request.getHeader('Authorization')
@@ -195,10 +195,10 @@ class MediaServer(resource.Resource):
         logger.debug(f'\nReceived request for {request.uri}')
 
         try:
-            if request.path == b'/api/protocols':
-                return self.do_choose_protocols(request)
-            elif request.path == b'/api/parameters':
+            if request.path == b'/api/parameters':
                 return self.do_parameters(request)
+            elif request.path == b'/api/protocols':
+                return self.do_choose_protocols(request)
             #elif request.uri == 'api/key':
             #...
             #elif request.uri == 'api/auth':
