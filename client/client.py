@@ -29,121 +29,142 @@ logger.setLevel(logging.INFO)
 
 SERVER_URL = 'http://127.0.0.1:8080'
 
-# Client variables
-PARAMETERS = None
-PRIVKEY = None
-PUBLICKEY = None
-SHAREDKEY = None
+class MediaClient:
 
-CIPHER = None
-DIGEST = None
-CIPHERMODE = None
+    # Constructor
+    def __init__(self, SERVER_URL):
+        print("|--------------------------------------|")
+        print("|         SECURE MEDIA CLIENT          |")
+        print("|--------------------------------------|\n")
 
+        self.SERVER_URL = SERVER_URL
+
+        # 1. Define the client private and public keys
+        print("Initializing client...")
+        self.parameters = ask_server_parameters(self.SERVER_URL)
+        print("\nGot parameters\n", self.parameters)
+
+        # 2. Generate the client private and public keys
+        self.private_key, self.public_key = CryptoFunctions.newKeys(self.parameters)
+
+        print("\nPrivate key created!\n", self.private_key)
+        print(self.private_key.private_bytes(
+            encoding = serialization.Encoding.PEM,
+            format = serialization.PrivateFormat.PKCS8,
+            encryption_algorithm = serialization.NoEncryption()
+        ))
+        print("\nPublic key generated!\n", self.public_key)
+        print(self.public_key.public_bytes(
+            encoding = serialization.Encoding.PEM,
+            format = serialization.PublicFormat.SubjectPublicKeyInfo
+        ))
+
+        # Initialize other vars
+        self.shared_key = None
+        self.CIPHER = None
+        self.DIGEST = None
+        self.CIPHERMODE = None
+
+    def start(self):
+        """
+        Defines the cipher suite and negociates the shared key
+        """
+        # 1. Let user choose chipher suite
+        cipherSuite = client_chosen_options(self.SERVER_URL)
+        self.CIPHER, self.DIGEST, self.CIPHERMODE = cipherSuite['cipher'], cipherSuite['digest'], cipherSuite['cipher_mode']
+        requests.post(f'{self.SERVER_URL}/api/suite', data = cipherSuite)
+        print(f"\nCipher suite defined!\nCipher: {self.CIPHER}; DIGEST: {self.DIGEST}; CIPHERMODE: {self.CIPHERMODE}")
+
+        # 2. Negociate encription keys (Diffie-Hellman)
+        self.shared_key = diffieHellman(self.SERVER_URL, self.private_key, self.public_key)
+        print("\nGenerated the client shared key!\n", self.shared_key)
     
-def main():
-    print("|--------------------------------------|")
-    print("|         SECURE MEDIA CLIENT          |")
-    print("|--------------------------------------|\n")
+    def run(self):
+        """
+        This method is used to play the media content from the server
+        """
+        # Validate that client has already been started
+        required = [self.shared_key, self.CIPHER, self.DIGEST, self.CIPHERMODE]
+        if not all([a for a in required]):
+            print("ERROR! The client can't be run without having been started first!")
+            return
 
-    # 1. Define the client private and public keys
-    print("Initializing client...")
-    PARAMETERS = ask_server_parameters(SERVER_URL)
-    print("\nGot parameters\n", PARAMETERS)
-
-    PRIVKEY, PUBLICKEY = CryptoFunctions.newKeys(PARAMETERS)
-
-    print("\nPrivate key created!\n", PRIVKEY)
-    print(PRIVKEY.private_bytes(
-        encoding = serialization.Encoding.PEM,
-        format = serialization.PrivateFormat.PKCS8,
-        encryption_algorithm = serialization.NoEncryption()
-    ))
-    print("\nPublic key generated!\n", PUBLICKEY)
-    print(PUBLICKEY.public_bytes(
-        encoding = serialization.Encoding.PEM,
-        format = serialization.PublicFormat.SubjectPublicKeyInfo
-    ))
-
-    # Get a list of media files
-    print("Contacting Server")
-    
-    # TODO: Secure the session
-    #isto é.. concorrênia?
-    
-    
-    # 1. Let user choose chipher suite
-    cipherSuite = client_chosen_options(SERVER_URL)
-    CIPHER, DIGEST, CIPHERMODE = cipherSuite['cipher'], cipherSuite['digest'], cipherSuite['cipher_mode']
-    requests.post(f'{SERVER_URL}/api/suite', data = cipherSuite)
-    print(f"\nCipher suite defined!\nCipher: {CIPHER}; DIGEST: {DIGEST}; CIPHERMODE: {CIPHERMODE}")
-
-    # 2. Negociate encription keys (Diffie-Hellman)
-    SHAREDKEY = diffieHellman(SERVER_URL, PRIVKEY, PUBLICKEY)
-    print("\nGenerated the client shared key!\n", SHAREDKEY)
-
-    # ?. Get media list from server
-    req = requests.get(f'{SERVER_URL}/api/list')
-    if req.status_code == 200:
-        print("Got Server List")
-    
-    media_list = req.json()
-    print(media_list)
-    
-    # ?. Present a simple selection menu    
-    idx = 0
-    print("MEDIA CATALOG\n")
-    for item in media_list:
-        print(f'{idx} - {media_list[idx]["name"]}')
-    print("----")
-
-    while True:
-        selection = input("Select a media file number (q to quit): ")
-        if selection.strip() == 'q':
-            sys.exit(0)
-
-        if not selection.isdigit():
-            continue
-
-        selection = int(selection)
-        if 0 <= selection < len(media_list):
-            break
-
-    # Example: Download first file
-    media_item = media_list[selection]
-    print(f"Playing {media_item['name']}")
-
-    # Detect if we are running on Windows or Linux
-    # You need to have ffplay or ffplay.exe in the current folder
-    # In alternative, provide the full path to the executable
-    if os.name == 'nt':
-        proc = subprocess.Popen(['ffplay.exe', '-i', '-'], stdin=subprocess.PIPE)
-    else:
-        proc = subprocess.Popen(['ffplay', '-i', '-'], stdin=subprocess.PIPE)
-
-    # Get data from server and send it to the ffplay stdin through a pipe
-    for chunk in range(media_item['chunks'] + 1):
-        req = requests.get(f'{SERVER_URL}/api/download?id={media_item["id"]}&chunk={chunk}')
+        # Get a list of media files
+        print("Contacting Server")
         
-        chunk = CryptoFunctions.symetric_encryption(
-            key = SHAREDKEY,
-            message = req.content,
-            algorithm_name = CIPHER,
-            cypher_mode = CIPHERMODE,
-            digest_mode = DIGEST,
-            encode = False
-        )
+        # TODO: Secure the session
 
-        chunk = json.loads(chunk.decode())
-               
-        # TODO: Process chunk
+        # ?. Get media list from server
+        req = requests.get(f'{SERVER_URL}/api/list')
+        if req.status_code == 200:
+            print("Got Server List")
+        
+        print(req)
+        print("req.content", req.content)
+        media_list = json.loads(self.decipher(req.content).decode())
+        print(media_list)
+        
+        # ?. Present a simple selection menu    
+        idx = 0
+        print("MEDIA CATALOG\n")
+        for item in media_list:
+            print(f'{idx} - {media_list[idx]["name"]}')
+        print("----")
 
-        data = binascii.a2b_base64(chunk['data'].encode('latin'))
-        try:
-            proc.stdin.write(data)
-        except:
-            break
+        while True:
+            selection = input("Select a media file number (q to quit): ")
+            if selection.strip() == 'q':
+                sys.exit(0)
+
+            if not selection.isdigit():
+                continue
+
+            selection = int(selection)
+            if 0 <= selection < len(media_list):
+                break
+
+        # Example: Download first file
+        media_item = media_list[selection]
+        print(f"Playing {media_item['name']}")
+
+        # Detect if we are running on Windows or Linux
+        # You need to have ffplay or ffplay.exe in the current folder
+        # In alternative, provide the full path to the executable
+        if os.name == 'nt':
+            proc = subprocess.Popen(['ffplay.exe', '-i', '-'], stdin=subprocess.PIPE)
+        else:
+            proc = subprocess.Popen(['ffplay', '-i', '-'], stdin=subprocess.PIPE)
+
+        # Get data from server and send it to the ffplay stdin through a pipe
+        for chunk in range(media_item['chunks'] + 1):
+            req = requests.get(f'{SERVER_URL}/api/download?id={media_item["id"]}&chunk={chunk}')
+            
+            chunk = json.loads(self.decipher(req.content).decode())
+                
+            # TODO: Process chunk
+
+            data = binascii.a2b_base64(chunk['data'].encode('latin'))
+            try:
+                proc.stdin.write(data)
+            except:
+                break
+
+    def decipher(self, content):
+        """
+        Deciphers a criptogram passed as argument
+        """
+        return CryptoFunctions.symetric_encryption( 
+            key = self.shared_key, 
+            message = content, 
+            algorithm_name = self.CIPHER, 
+            cypher_mode = self.CIPHERMODE, 
+            digest_mode = self.DIGEST, 
+            encode = False 
+        ) 
     
-if __name__ == '__main__':
-    while True:
-        main()
-        time.sleep(1)
+c = MediaClient(SERVER_URL)
+c.start()
+
+while True:
+    c.run()
+    time.sleep(1)

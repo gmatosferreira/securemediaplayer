@@ -85,10 +85,11 @@ class MediaServer(resource.Resource):
 
     # Send the list of available protocols
     def do_choose_protocols(self, request):
-        protocols = {'cipher': ['AES','3DEs'], 
-                    'digests': ['SHA512', 'BLAKE2'], 
-                    'cipher_mode': ['CBC', 'OFB']  
-                    }
+        protocols = {
+            'cipher': ['AES','3DEs'], 
+            'digests': ['SHA512', 'BLAKE2'], 
+            'cipher_mode': ['CBC', 'OFB']  
+        }
         
         request.responseHeaders.addRawHeader(b"content-type", b"application/json")
         return json.dumps(protocols).encode('latin')
@@ -101,7 +102,6 @@ class MediaServer(resource.Resource):
         #if not auth:
         #    request.setResponseCode(401)
         #    return 'Not authorized'
-
 
         # Build list
         media_list = []
@@ -117,8 +117,8 @@ class MediaServer(resource.Resource):
 
         # Return list to client
         request.responseHeaders.addRawHeader(b"content-type", b"application/json")
-        
-        return json.dumps(media_list, indent=4).encode('latin')
+        message = json.dumps(media_list).encode()
+        return self.cipher(message)
 
 
     # Send a media chunk to the client
@@ -132,7 +132,8 @@ class MediaServer(resource.Resource):
         if media_id is None:
             request.setResponseCode(400)
             request.responseHeaders.addRawHeader(b"content-type", b"application/json")
-            return json.dumps({'error': 'invalid media id'}).encode('latin')
+            message = json.dumps({'error': 'invalid media id'}).encode()
+            return self.cipher(message)
         
         # Convert bytes to str
         media_id = media_id.decode('latin')
@@ -141,7 +142,8 @@ class MediaServer(resource.Resource):
         if media_id not in CATALOG:
             request.setResponseCode(404)
             request.responseHeaders.addRawHeader(b"content-type", b"application/json")
-            return json.dumps({'error': 'media file not found'}).encode('latin')
+            message = json.dumps({'error': 'media file not found'}).encode()
+            return self.cipher(message)
         
         # Get the media item
         media_item = CATALOG[media_id]
@@ -159,7 +161,8 @@ class MediaServer(resource.Resource):
         if not valid_chunk:
             request.setResponseCode(400)
             request.responseHeaders.addRawHeader(b"content-type", b"application/json")
-            return json.dumps({'error': 'invalid chunk id'}).encode('latin')
+            message = json.dumps({'error': 'invalid chunk id'}).encode()
+            return self.cipher(message)
             
         logger.debug(f'Download: chunk: {chunk_id}')
 
@@ -171,24 +174,19 @@ class MediaServer(resource.Resource):
             data = f.read(CHUNK_SIZE)
 
             request.responseHeaders.addRawHeader(b"content-type", b"application/json")
-            return CryptoFunctions.symetric_encryption(
-                key = self.shared_key,
-                message = json.dumps(
-                    {
-                        'media_id': media_id, 
-                        'chunk': chunk_id, 
-                        'data': binascii.b2a_base64(data).decode('latin').strip()
-                    }
-                ).encode(),
-                algorithm_name = self.CIPHER,
-                cypher_mode = self.CIPHER_MODE,
-                digest_mode = self.DIGEST,
-                encode = True
-            )
+            message = json.dumps(
+                {
+                    'media_id': media_id, 
+                    'chunk': chunk_id, 
+                    'data': binascii.b2a_base64(data).decode('latin').strip()
+                }
+            ).encode()
+            return self.cipher(message)
 
         # File was not open?
         request.responseHeaders.addRawHeader(b"content-type", b"application/json")
-        return json.dumps({'error': 'unknown'}, indent=4).encode('latin')
+        message = json.dumps({'error': 'unknown'}).encode()
+        return self.cipher(message)
 
     # Handle a GET request
     def render_GET(self, request):
@@ -278,6 +276,17 @@ class MediaServer(resource.Resource):
             request.setResponseCode(501)
             request.responseHeaders.addRawHeader(b"content-type", b"text/plain")
             return b''
+
+    # Cipher
+    def cipher(self, message):
+        return CryptoFunctions.symetric_encryption(
+            key = self.shared_key,
+            message = message,
+            algorithm_name = self.CIPHER,
+            cypher_mode = self.CIPHER_MODE,
+            digest_mode = self.DIGEST,
+            encode = True
+        )
 
 
 print("Server started")
