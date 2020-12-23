@@ -135,12 +135,17 @@ class MediaClient:
 
         # Get data from server and send it to the ffplay stdin through a pipe
         for chunk in range(media_item['chunks'] + 1):
-            req = requests.get(f'{SERVER_URL}/api/download?id={media_item["id"]}&chunk={chunk}')
-            
-            message = self.decipher(req)
-            if not message:
-                continue
-            chunk = json.loads(message.decode())
+
+            # Make request until gets a valid answer (max 5 times)
+            for i in range(0,5):
+                req = requests.get(f'{SERVER_URL}/api/download?id={media_item["id"]}&chunk={chunk}')
+                
+                message = self.decipher(req)
+                if not message:
+                    continue
+
+                chunk = json.loads(message.decode())
+                break
 
             # TODO: Process chunk
 
