@@ -83,28 +83,26 @@ class MediaClient:
         """
         This method is used to play the media content from the server
         """
-        # Validate that client has already been started
+        # 1. Validate that client has already been started
         required = [self.shared_key, self.CIPHER, self.DIGEST, self.CIPHERMODE]
         if not all([a for a in required]):
             print("ERROR! The client can't be run without having been started first!")
             return
 
-        # Get a list of media files
+        # 2. Get a list of media files
         print("Contacting Server")
-        
-        # TODO: Secure the session
-
-        # ?. Get media list from server
         req = requests.get(f'{SERVER_URL}/api/list')
         if req.status_code == 200:
             print("Got Server List")
         
-        print(req)
-        print("req.content", req.content)
-        media_list = json.loads(self.decipher(req.content).decode())
+        print(req.headers)
+        message = self.decipher(req)
+        if not message:
+            return
+        media_list = json.loads(message.decode())
         print(media_list)
         
-        # ?. Present a simple selection menu    
+        # 3. Present a simple selection menu    
         idx = 0
         print("MEDIA CATALOG\n")
         for item in media_list:
@@ -139,8 +137,11 @@ class MediaClient:
         for chunk in range(media_item['chunks'] + 1):
             req = requests.get(f'{SERVER_URL}/api/download?id={media_item["id"]}&chunk={chunk}')
             
-            chunk = json.loads(self.decipher(req.content).decode())
-                
+            message = self.decipher(req)
+            if not message:
+                continue
+            chunk = json.loads(message.decode())
+
             # TODO: Process chunk
 
             data = binascii.a2b_base64(chunk['data'].encode('latin'))
@@ -149,13 +150,27 @@ class MediaClient:
             except:
                 break
 
-    def decipher(self, content):
+    def decipher(self, request):
         """
-        Deciphers a criptogram passed as argument
+        Validates the MIC sent on the header 
+        Deciphers the criptogram on the request content
         """
+
+        print("\nDeciphering request...\n", request.content.strip())
+        print("\nGot MIC...\n", request.headers['Mic'].encode('latin'))
+
+        MIC = CryptoFunctions.create_digest(request.content.strip(), self.DIGEST)
+        print("\nMIC computed...\n", MIC)
+        
+        if MIC != request.headers['Mic'].encode('latin'):
+            print("INVALID MIC!")
+            return None
+        else:
+            print("Validated MIC!")
+
         return CryptoFunctions.symetric_encryption( 
             key = self.shared_key, 
-            message = content, 
+            message = request.content, 
             algorithm_name = self.CIPHER, 
             cypher_mode = self.CIPHERMODE, 
             digest_mode = self.DIGEST, 
