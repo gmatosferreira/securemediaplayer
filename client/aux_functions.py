@@ -8,6 +8,15 @@ from crypto_functions import CryptoFunctions
 # Serialization
 from cryptography.hazmat.primitives import serialization
 
+"""
+This method asks the server for the DH parameter group
+and returns it as a DHParameters instance.
+
+--- Parameters
+server_url      The server url
+--- Returns
+parameters      DHParameters
+"""
 def ask_server_parameters(server_url):
 
     # 1. Get the server parameters
