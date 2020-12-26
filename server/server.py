@@ -255,7 +255,7 @@ class MediaServer(resource.Resource):
         }).encode('latin')
     
     def process_negotiation(self,request):
-        data = request.args.get(b'id', "digest" )
+        data = request.args
         
         if data == None or data == '':
             print('Data is none or empty')

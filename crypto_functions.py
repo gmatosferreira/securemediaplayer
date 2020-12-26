@@ -77,8 +77,8 @@ class CryptoFunctions:
             # Show options
             print("\nChoose a cipher algorithm: ")
             i=1
-            for cipher in protocols['cipher']:
-                print(i, ")",cipher)
+            for c in protocols['cipher']:
+                print(i, ")",c)
                 i+=1
             # Receive input
             print("> " , end =" ")
@@ -93,14 +93,14 @@ class CryptoFunctions:
             # Show options
             print("\nChoose a digest: ")
             i=1
-            for digest in protocols['digests']:
-                print(i, ")",digest)
+            for d in protocols['digests']:
+                print(i, ")",d)
                 i+=1
             # Receive input
             print("> " , end =" ")
             op = int(input())
             if op >= 1 and op <= len(protocols['digests']):
-                cipher = protocols['digests'][op-1]
+                digest = protocols['digests'][op-1]
                 break
             print("That is not a valid option! Try again!")
 
