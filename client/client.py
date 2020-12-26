@@ -181,6 +181,13 @@ class MediaClient:
             digest_mode = self.DIGEST, 
             encode = False 
         ) 
+
+    def user_login(self):
+        username = input("Username: ")
+        password = input("Password: ")
+
+    def user_logout(self):
+        pass
     
 c = MediaClient(SERVER_URL)
 c.start()

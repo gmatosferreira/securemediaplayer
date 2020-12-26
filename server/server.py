@@ -20,6 +20,7 @@ import sys
 sys.path.append('..')
 
 from crypto_functions import CryptoFunctions
+from licenses import *
 
 logger = logging.getLogger('root')
 FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
@@ -120,6 +121,13 @@ class MediaServer(resource.Resource):
         message = json.dumps(media_list).encode()
         return self.cipher(request, message)
 
+    #login and create new license
+    def do_new_license(self, username, password):
+        add_new_license(username,password)
+
+    #logout and update license
+    def do_update_license(username):
+        update_license(username)
 
     # Send a media chunk to the client
     def do_download(self, request):
@@ -207,6 +215,12 @@ class MediaServer(resource.Resource):
             elif request.path == b'/api/download':
                 print("OK")
                 return self.do_download(request)
+                
+            elif request.path == b'/api/download':
+                    print("OK")
+                return self.do_download(request)
+            do_new_license
+
             else:
                 request.responseHeaders.addRawHeader(b"content-type", b'text/plain')
                 return b'Methods: /api/protocols /api/list /api/download'
@@ -269,7 +283,7 @@ class MediaServer(resource.Resource):
                 return self.process_negotiation(request)
             elif request.path == b'/api/publickey':
                 return self.do_public_key(request)
-
+          
         
         except Exception as e:
             logger.exception(e)

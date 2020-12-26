@@ -297,53 +297,7 @@ class CryptoFunctions:
 
         return True
     
-    """
-    def license_exists(username):
-        with open('licenses.txt') as licenses_file:
-        licenseData = json.load(licenses_file)
-        for license in licenseData['availableLicenses']:
-            if license['name'] == username:
-                print("Username Exists")
-                return True, license
-            
-    #Fernet modo de encriptacao
-    def encrypt_password(message, key):
-        return Fernet(key).encrypt(message)
-    
-    def decrypt_password(token, key):
-        return Fernet(key).decrypt(token)      
-    
-     
-
-    @staticmethod
-    def licences(user, password):
-        username = input("Username: ")
-        password = input("Password: ")
-        
-        userExist, license = license_exists(username)
-        if userExist:
-            username = license['username']
-            token = _
-            password = decrypt_password(token, license['password']).decode()
-            time = license['time']
-            numOfViwes = license['numOfViwes']
-            #TODO
-            #contar tempos, ver se ele esta ou n logado e ver number os views
-            
-            
-        else:
-            # each user has a usage time of 1 hour and 10 number os views
-            licenseData = {}
-            licenseData['availableLicenses'].append({
-                'username': username,
-                'password': encrypt_password(password.encode()),
-                'time:' 60,
-                'numOfViwes': 10
-            })
-            
-            with open('licenses.txt', 'w') as newLicense:
-                json.dump(licenseData, newLicense)
-    """
+   
             
 
         
