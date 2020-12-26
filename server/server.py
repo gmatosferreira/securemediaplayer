@@ -46,8 +46,12 @@ class MediaServer(resource.Resource):
     # Constructor
     def __init__(self):
         print("Initializing server...")
-        # Create the private/public keys pais
-        self.parameters = dh.generate_parameters(generator=2, key_size=2048)
+        # TODO Change on production to new parameters every initialization! 
+        # self.parameters = dh.generate_parameters(generator=2, key_size=2048)
+        with open('parameters', 'rb') as f:
+            self.parameters = serialization.load_pem_parameters(f.read().strip())    
+            print("Loaded parameters!")
+        # Create the private/public keys pairs
         self.private_key, self.public_key = CryptoFunctions.newKeys(self.parameters)
         self.shared_key = None
 
