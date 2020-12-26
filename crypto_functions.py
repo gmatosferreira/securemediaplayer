@@ -1,4 +1,4 @@
-          import requests
+import requests
 import logging
 import os
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -100,7 +100,7 @@ class CryptoFunctions:
             print("> " , end =" ")
             op = int(input())
             if op >= 1 and op <= len(protocols['digests']):
-                cipher = protocols['digests'][op-1]
+                digest = protocols['digests'][op-1]
                 break
             print("That is not a valid option! Try again!")
 
@@ -153,8 +153,8 @@ class CryptoFunctions:
 
         if digst_algorithm == "SHA512":
             hash_algorithm = hashes.SHA512()
-        elif algorithm == "BLAKE2":
-            digst_algorithm = hashes.BLAKE2b(64)
+        elif digst_algorithm == "BLAKE2":
+            hash_algorithm = hashes.BLAKE2b(64)
         else:
             raise Exception("Digest Algorithm name not founded!")
 

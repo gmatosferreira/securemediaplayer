@@ -65,6 +65,16 @@ class MediaClient:
         self.DIGEST = None
         self.CIPHERMODE = None
 
+    def user_login(self):
+
+        self.username = input("Username: ")
+        self.password = input("Password: ")
+        login_data  = {"username": self.username, "password": self.password}
+        requests.post(f'{self.SERVER_URL}/api/newLicense', data = login_data)
+    """
+    def user_logout(self):
+        requests.post(f'{self.SERVER_URL}/api/update_license', data = {"username": self.username})
+    """
     def start(self):
         """
         Defines the cipher suite and negociates the shared key
@@ -78,6 +88,11 @@ class MediaClient:
         # 2. Negociate encription keys (Diffie-Hellman)
         self.shared_key = diffieHellman(self.SERVER_URL, self.private_key, self.public_key)
         print("\nGenerated the client shared key!\n", self.shared_key)
+
+        #3. Login and create a new license
+        self.user_login()
+
+
     
     def run(self):
         """
@@ -182,12 +197,7 @@ class MediaClient:
             encode = False 
         ) 
 
-    def user_login(self):
-        username = input("Username: ")
-        password = input("Password: ")
 
-    def user_logout(self):
-        pass
     
 c = MediaClient(SERVER_URL)
 c.start()

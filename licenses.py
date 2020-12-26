@@ -34,12 +34,13 @@ def add_new_license(username,password):
     
     #check if user is not authenticated
     if not check_user(username, password):
-        time = time_now.hour*60 + time_now.minute
+        #time = time_now.hour*60 + time_now.minute
+        time = 60 #time = 60 minutes
         license = {
             'username': username ,
             'passwordEncrypt': password_encrypt.decode("utf-8") ,
             'key': key.decode("utf-8"),
-            'time': str(time),
+            'time': time,
             'numOfViews': 10
         }
 
@@ -50,7 +51,7 @@ def add_new_license(username,password):
 
 
 #function used to update user license when he is logout
-def update_license(username):
+def update_license(username, media_duration):
 
     file = open('licenses.txt', 'r')
     licenses = json.load(file)
@@ -67,15 +68,15 @@ def update_license(username):
             licenses.remove(license)
 
             #check user permission
-            if user_permission(time, numOfViews):
+            if user_permission(time-media_duration, numOfViews):
                 #create new license
-                time_now = datetime.now()
-                time_now_ = time_now.hour*60 + time_now.minute
+                #time_now = datetime.now()
+                #time_now_ = time_now.hour*60 + time_now.minute
                 newLicense = {
                     'username': username,
                     'passwordEncrypt': password,
                     'key': key,
-                    'time': str(time_now_),
+                    'time':time - media_duration,
                     'numOfViews': numOfViews -1
                     }
                 licenses.append(newLicense)
@@ -86,11 +87,11 @@ def update_license(username):
 
 
 #function used to validate if user has more permissions
-def user_permission(timePast, numOfViews):
+def user_permission(time, numOfViews):
     #check if user has no more permissions
-    time_now = datetime.now().hour* 60 +  datetime.now().minute
+    #time_now = datetime.now().hour* 60 +  datetime.now().minute
 
-    if numOfViews == 0 or time_now - int(timePast) == 60:
+    if numOfViews == 0 or time <= 0:
         print("User has no more available licenses")
         return False
     return True
@@ -113,7 +114,7 @@ def check_user(username, password):
             print("Username is authenticated")
             return True
     return False
-
+""""
 #logout
 def logout(username):
     update_license(username)
@@ -123,7 +124,7 @@ def logout(username):
 def login(username, password):
     add_new_license(username,password)
 
-"""
+
 
 if __name__ == "__main__":
 

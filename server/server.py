@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 from twisted.web import server, resource
 from twisted.internet import reactor, defer
 import logging
@@ -121,13 +120,6 @@ class MediaServer(resource.Resource):
         message = json.dumps(media_list).encode()
         return self.cipher(request, message)
 
-    #login and create new license
-    def do_new_license(self, username, password):
-        add_new_license(username,password)
-
-    #logout and update license
-    def do_update_license(username):
-        update_license(username)
 
     # Send a media chunk to the client
     def do_download(self, request):
@@ -163,6 +155,10 @@ class MediaServer(resource.Resource):
             chunk_id = int(chunk_id.decode('latin'))
             if chunk_id >= 0 and chunk_id  < math.ceil(media_item['file_size'] / CHUNK_SIZE):
                 valid_chunk = True
+                #if is valid chunck update_license
+                media_duration= media_item['duration']
+                
+                update_license(self.username,media_duration)
         except:
             logger.warn("Chunk format is invalid")
 
@@ -216,10 +212,8 @@ class MediaServer(resource.Resource):
                 print("OK")
                 return self.do_download(request)
                 
-            elif request.path == b'/api/download':
-                    print("OK")
-                return self.do_download(request)
-            do_new_license
+       
+            
 
             else:
                 request.responseHeaders.addRawHeader(b"content-type", b'text/plain')
@@ -237,7 +231,7 @@ class MediaServer(resource.Resource):
     session shared key (Diffie-Hellman) 
     """
     def do_public_key(self, request):
-        data = request.args.get(b'public_key')
+        data = request.args
         if data == None or data == '':
             print('Data is none or empty')
             return 
@@ -265,7 +259,7 @@ class MediaServer(resource.Resource):
         }).encode('latin')
     
     def process_negotiation(self,request):
-        data = request.args.get(b'id', "digest" )
+        data = request.args
         
         if data == None or data == '':
             print('Data is none or empty')
@@ -274,7 +268,29 @@ class MediaServer(resource.Resource):
             self.DIGEST = request.args[b'digest'][0].decode('utf-8')
             self.CIPHER_MODE = request.args[b'cipher_mode'][0].decode('utf-8')
             print(f"\n\nDefined chiper suite as:\nCipher: {self.CIPHER}\nDigest: {self.DIGEST}\nMode: {self.CIPHER_MODE}\n")
-        
+    
+    #login and create new license
+    
+    def new_license(self, request):
+        data = request.args
+        username, password = ""
+        if data == None or data == '':
+            print('Data is none or empty')
+        else:
+            self.username  = request.args[b'username'][0].decode('utf-8')
+            password = request.args[b'passowrd'][0].decode('utf-8')
+        add_new_license( self.username,password)
+   
+    """
+    #logout and update license
+    def update_license(self, request):
+        data = request.args
+        if data == None or data == '':
+            print('Data is none or empty')
+        else:
+            self.USERNAME = request.args[b'username'][0].decode('utf-8')
+    """    
+
     # Handle a POST request
     def render_POST(self, request):
         logger.debug(f'\nReceived POST for {request.uri}')
@@ -283,6 +299,9 @@ class MediaServer(resource.Resource):
                 return self.process_negotiation(request)
             elif request.path == b'/api/publickey':
                 return self.do_public_key(request)
+            elif request.path == b'/api/newLicense':
+                return self.new_license(request)
+
           
         
         except Exception as e:
