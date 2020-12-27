@@ -79,15 +79,16 @@ class MediaClient:
         """
         Defines the cipher suite and negociates the shared key
         """
+        # 1. Negociate encription keys (Diffie-Hellman)
+        self.shared_key = diffieHellman(self.SERVER_URL, self.private_key, self.public_key)
+        print("\nGenerated the client shared key!\n", self.shared_key)
+        
         # 1. Let user choose chipher suite
         cipherSuite = client_chosen_options(self.SERVER_URL)
         self.CIPHER, self.DIGEST, self.CIPHERMODE = cipherSuite['cipher'], cipherSuite['digest'], cipherSuite['cipher_mode']
-        requests.post(f'{self.SERVER_URL}/api/suite', data = cipherSuite)
         print(f"\nCipher suite defined!\nCipher: {self.CIPHER}; DIGEST: {self.DIGEST}; CIPHERMODE: {self.CIPHERMODE}")
+        #requests.post(f'{self.SERVER_URL}/api/suite', data = cipherSuite)
 
-        # 2. Negociate encription keys (Diffie-Hellman)
-        self.shared_key = diffieHellman(self.SERVER_URL, self.private_key, self.public_key)
-        print("\nGenerated the client shared key!\n", self.shared_key)
 
         #3. Login and create a new license
         self.user_login()

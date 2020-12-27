@@ -4,6 +4,7 @@ import logging
 import sys
 sys.path.append('..')
 from crypto_functions import CryptoFunctions
+import uuid
 
 # Serialization
 from cryptography.hazmat.primitives import serialization
@@ -110,6 +111,7 @@ server_url          The server base url
 private_key         The client private key
 public_key          The client public key
 --- Returns
+sessionid           The session id
 shared_key          The client shared key
 """
 def diffieHellman(server_url, private_key, public_key):
@@ -129,7 +131,11 @@ def diffieHellman(server_url, private_key, public_key):
         print("The server is not available!")
         exit()
 
-    # 1.2. Get the server public key as an answer to the POST request
+    # 1.2. Get the session id
+    sessionid = uuid.UUID(bytes=req.headers['sessionid'].encode('latin'))
+    print("\nGot session id...\n", sessionid)
+
+    # 1.3. Get the server public key as an answer to the POST request
     server_public_key_bytes = bytes(req.json()['public_key'], 'utf-8')
     server_public_key = serialization.load_pem_public_key(server_public_key_bytes)
     print("\nGot the server public key!\n", server_public_key)
@@ -137,4 +143,4 @@ def diffieHellman(server_url, private_key, public_key):
     # 2. Generate the shared key based on the server public key
     shared_key = private_key.exchange(server_public_key)
 
-    return shared_key
+    return sessionid, shared_key

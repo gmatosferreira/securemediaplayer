@@ -6,6 +6,7 @@ import binascii
 import json
 import os
 import math
+import uuid
 
 # Serialization
 from cryptography.hazmat.primitives import serialization
@@ -52,25 +53,13 @@ class MediaServer(resource.Resource):
             self.parameters = serialization.load_pem_parameters(f.read().strip())    
             print("Loaded parameters!")
         # Create the private/public keys pairs
-        self.private_key, self.public_key = CryptoFunctions.newKeys(self.parameters)
         self.shared_key = None
 
         self.CIPHER = None
         self.DIGEST = None
         self.CIPHER_MODE= None
         self.KEY = None
-        
-        print("\nPrivate key created!\n", self.private_key)
-        print(self.private_key.private_bytes(
-            encoding = serialization.Encoding.PEM,
-            format = serialization.PrivateFormat.PKCS8,
-            encryption_algorithm = serialization.NoEncryption()
-        ))
-        print("\nPublic key generated!\n", self.public_key)
-        print(self.public_key.public_bytes(
-            encoding = serialization.Encoding.PEM,
-            format = serialization.PublicFormat.SubjectPublicKeyInfo
-        ))
+        self.sessions = {}
 
     # Send the server public key
     def do_parameters(self, request):
@@ -230,9 +219,10 @@ class MediaServer(resource.Resource):
             return b''
         
     """
-    This method allows the client to send his public key
-    and get the server's one, so that they both generate the 
-    session shared key (Diffie-Hellman) 
+    This method allows the client to register at the server (send his public key)
+    The server generates a key pair for that client and a shared key based on those
+    It also generates a session id for client
+    Answers to client the server public key and the session id
     """
     def do_public_key(self, request):
         data = request.args
@@ -241,23 +231,49 @@ class MediaServer(resource.Resource):
             return 
         print(request.args) 
 
-        # 1. Get the client shared key and public key
+        # 1. Get the client public key
         print("\nClient public key raw.\n", request.args[b'public_key'][0])
         client_public_key = serialization.load_pem_public_key(request.args[b'public_key'][0])
         print("\nGot the client public key!\n", client_public_key)
 
-        # 2. Diffie-Hellman | Generate shared key
-        self.shared_key = self.private_key.exchange(client_public_key)
-        print("\nGenerated the server shared key!\n", self.shared_key)
+        # 2. Generate a session id for client
+        sessionid = uuid.uuid1()
+        print("\nGenerated session id for client:", sessionid)
 
-        # 3. Convert public key to bytes
-        pk = self.public_key.public_bytes(
+        # 3. Generate key pair for client
+        private_key, public_key = CryptoFunctions.newKeys(self.parameters)
+        print("\nPrivate key created!\n", private_key)
+        print(private_key.private_bytes(
+            encoding = serialization.Encoding.PEM,
+            format = serialization.PrivateFormat.PKCS8,
+            encryption_algorithm = serialization.NoEncryption()
+        ))
+        print("\nPublic key generated!\n", public_key)
+        print(public_key.public_bytes(
+            encoding = serialization.Encoding.PEM,
+            format = serialization.PublicFormat.SubjectPublicKeyInfo
+        ))
+
+        # 4. Diffie-Hellman | Generate shared key
+        shared_key = private_key.exchange(client_public_key)
+        print("\nGenerated the shared key for client!\n", shared_key)
+
+        # 5. Convert public key to bytes
+        pk = public_key.public_bytes(
             encoding = serialization.Encoding.PEM,
             format = serialization.PublicFormat.SubjectPublicKeyInfo
         )
         print("\nSerialized public key to answer request!\n", pk)
- 
-        # 3.1. Return it
+
+        # 6. Register client session
+        self.sessions[sessionid] = {
+            'public_key': public_key,
+            'private_key': private_key,
+            'shared_key': shared_key
+        }
+
+        # 7. Return public key to client
+        request.responseHeaders.addRawHeader(b"sessionid", sessionid.bytes)
         return json.dumps({
             'public_key': pk.decode('utf-8'),
         }).encode('latin')
