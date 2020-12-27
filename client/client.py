@@ -155,7 +155,7 @@ class MediaClient:
             for i in range(0,5):
                 req = requests.get(f'{SERVER_URL}/api/download?id={media_item["id"]}&chunk={chunk}')
                 
-                message = self.decipher(req)
+                message = self.decipher(req, bytes(chunk))
                 if not message:
                     continue
 
@@ -170,10 +170,12 @@ class MediaClient:
             except:
                 break
 
-    def decipher(self, request):
+    def decipher(self, request, append=None):
         """
         Validates the MIC sent on the header 
         Deciphers the criptogram on the request content
+        --- Parameters
+        append      Bytes to append to shared_key before decyphering
         """
 
         print("\nDeciphering request...\n", request.content.strip())
@@ -189,7 +191,7 @@ class MediaClient:
             print("Validated MIC!")
 
         return CryptoFunctions.symetric_encryption( 
-            key = self.shared_key, 
+            key = self.shared_key if not append else self.shared_key + append, 
             message = request.content, 
             algorithm_name = self.CIPHER, 
             cypher_mode = self.CIPHERMODE, 

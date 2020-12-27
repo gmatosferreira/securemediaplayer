@@ -46,8 +46,12 @@ class MediaServer(resource.Resource):
     # Constructor
     def __init__(self):
         print("Initializing server...")
-        # Create the private/public keys pais
-        self.parameters = dh.generate_parameters(generator=2, key_size=2048)
+        # TODO Change on production to new parameters every initialization! 
+        # self.parameters = dh.generate_parameters(generator=2, key_size=2048)
+        with open('parameters', 'rb') as f:
+            self.parameters = serialization.load_pem_parameters(f.read().strip())    
+            print("Loaded parameters!")
+        # Create the private/public keys pairs
         self.private_key, self.public_key = CryptoFunctions.newKeys(self.parameters)
         self.shared_key = None
 
@@ -133,7 +137,7 @@ class MediaServer(resource.Resource):
             request.setResponseCode(400)
             request.responseHeaders.addRawHeader(b"content-type", b"application/json")
             message = json.dumps({'error': 'invalid media id'}).encode()
-            return self.cipher(request, message)
+            return self.cipher(request, message, bytes(chunk_id))
         
         # Convert bytes to str
         media_id = media_id.decode('latin')
@@ -143,7 +147,7 @@ class MediaServer(resource.Resource):
             request.setResponseCode(404)
             request.responseHeaders.addRawHeader(b"content-type", b"application/json")
             message = json.dumps({'error': 'media file not found'}).encode()
-            return self.cipher(request, message)
+            return self.cipher(request, message, bytes(chunk_id))
         
         # Get the media item
         media_item = CATALOG[media_id]
@@ -166,7 +170,7 @@ class MediaServer(resource.Resource):
             request.setResponseCode(400)
             request.responseHeaders.addRawHeader(b"content-type", b"application/json")
             message = json.dumps({'error': 'invalid chunk id'}).encode()
-            return self.cipher(request, message)
+            return self.cipher(request, message, bytes(chunk_id))
             
         logger.debug(f'Download: chunk: {chunk_id}')
 
@@ -185,12 +189,12 @@ class MediaServer(resource.Resource):
                     'data': binascii.b2a_base64(data).decode('latin').strip()
                 }
             ).encode()
-            return self.cipher(request, message)
+            return self.cipher(request, message, bytes(chunk_id))
 
         # File was not open?
         request.responseHeaders.addRawHeader(b"content-type", b"application/json")
         message = json.dumps({'error': 'unknown'}).encode()
-        return self.cipher(request, message)
+        return self.cipher(request, message, bytes(chunk_id))
 
     # Handle a GET request
     def render_GET(self, request):
@@ -311,13 +315,15 @@ class MediaServer(resource.Resource):
             return b''
 
     # Cipher
-    def cipher(self, request, response):
+    def cipher(self, request, response, append=None):
         """
         This method ciphers a response to a request
         It also generates a MIC for the cryptogram
+        --- Parameters
+        append      Bytes to append to shared_key before ciphering
         """
         cryptogram = CryptoFunctions.symetric_encryption(
-            key = self.shared_key,
+            key = self.shared_key if not append else self.shared_key + append,
             message = response,
             algorithm_name = self.CIPHER,
             cypher_mode = self.CIPHER_MODE,
