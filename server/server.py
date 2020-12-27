@@ -300,44 +300,44 @@ class MediaServer(resource.Resource):
     
     """
     This method handles the client authentication
+    To authenticate, the client must have started a session!
     """
     def do_auth(self, request):
         # Get data from request header
         print("\n\nAUTHENTICATION")
-        headers = request.getAllHeaders()
-        session = uuid.UUID(bytes=headers[b'sessionid'])
-        print("Session", session)
-        MIC = headers[b'mic']
+
+        # Process request 
+        # (Get session and decipher payload)
+        session, data = self.processRequest(request)
 
         # Validate that client has open session
-        if session not in self.sessions.keys():
+        if not session:
             return self.rawResponse(
                 request = request,
                 response = {'error': 'Client does not have a valid session!'},
                 error = True
             )
 
-        # Decipher payload
-        print("\nDecyphering payload...")
-        data = self.decipher(request, MIC, self.sessions[session])
-
+        # Validate that payload has data
         if not data:
-            request.setResponseCode(400)
-            request.responseHeaders.addRawHeader(b"content-type", b"application/json")
-            message = json.dumps()
             return self.cipherResponse(
                 request = request, 
-                message = {'error': 'Payload is not valid!'}, 
-                sessioninfo = self.sessions[session],
+                response = {'error': 'Payload is not valid!'}, 
+                sessioninfo = session,
                 error = True
             )
             
-        print(data)
+        print("\nAuthentication data is...\n", data)
         
         # Authenticate user
         # TODO
 
-        return None
+        return self.cipherResponse(
+            request = request, 
+            response = {'error': 'The authentication data is not valid!'}, 
+            sessioninfo = session,
+            error = True
+        )
                 
 
     #login and create new license
@@ -383,7 +383,7 @@ class MediaServer(resource.Resource):
             request.responseHeaders.addRawHeader(b"content-type", b"text/plain")
             return b''
 
-    # Responses
+    # Responses processing
     def cipherResponse(self, request, response, sessioninfo, append = None, error = False):
         """
         This method ciphers a response to a request
@@ -398,7 +398,7 @@ class MediaServer(resource.Resource):
         cryptogram      The response encrypted
         """
         print("\nAnswering...", response)
-        if not response: return None
+        if not response or not sessioninfo: return None
         # Convert Python Object to str and then to bytes
         message = json.dumps(response).encode()
         print("\nSerialized to...", message)
@@ -416,7 +416,7 @@ class MediaServer(resource.Resource):
         print("\nGenerated MIC:\n", MIC)
         # Add headers
         request.responseHeaders.addRawHeader(b"mic", MIC)
-        request.responseHeaders.addRawHeader(b"ciphered", str(ciphered))
+        request.responseHeaders.addRawHeader(b"ciphered", b"True")
         request.responseHeaders.addRawHeader(b"content-type", b"application/json")
         if error:
             request.setResponseCode(400)
@@ -452,33 +452,51 @@ class MediaServer(resource.Resource):
         # Return message
         return message
 
-
-    def decipher(self, request, RMIC, sessioninfo):
+    # Requests processing
+    def processRequest(self, request):
         """
+        Gets the user session
         Validates the MIC sent on the header 
         Deciphers the criptogram on the request content with the ket given
+        --- Parameters
+        request
+        --- Returns
+        session         Dict with session info
+        data            The payload deciphered and validated
         """
+        print("\nProcessing request...")
 
-        print("\nDeciphering request...\n", request.content.getvalue().strip())
+        # Get session and validate it
+        headers = request.getAllHeaders()
+        sessionid = uuid.UUID(bytes=headers[b'sessionid'])
+        if sessionid not in self.sessions.keys():
+            print(f"\nInvalid session! ({sessionid})")
+            return None, None
+        session = self.sessions[sessionid]
+        print("\nSession", sessionid)
+
+        # Get MIC and validate it
+        RMIC = headers[b'mic']
         print("\nGot MIC...\n", RMIC)
-
-        MIC = CryptoFunctions.create_digest(request.content.getvalue().strip(), sessioninfo['digest']).strip()
+        MIC = CryptoFunctions.create_digest(request.content.getvalue().strip(), session['digest']).strip()
         print("\nMIC computed...\n", MIC)
-        
         if MIC != RMIC:
             print("INVALID MIC!")
-            return None
+            return None, None
         else:
             print("Validated MIC!")
 
-        return CryptoFunctions.symetric_encryption( 
-            key = sessioninfo['shared_key'], 
+        # Decipher request
+        print("\nDeciphering request...\n", request.content.getvalue().strip())
+        message = CryptoFunctions.symetric_encryption( 
+            key = session['shared_key'], 
             message = request.content.getvalue(), 
-            algorithm_name = sessioninfo['cipher'], 
-            cypher_mode = sessioninfo['mode'], 
-            digest_mode = sessioninfo['digest'], 
+            algorithm_name = session['cipher'], 
+            cypher_mode = session['mode'], 
+            digest_mode = session['digest'], 
             encode = False 
         ) 
+        return session, json.loads(message) 
 
 
 print("Server started")

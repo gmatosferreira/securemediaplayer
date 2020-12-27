@@ -127,11 +127,12 @@ class MediaClient:
             print("\nAUTHENTICATION")
             username = input("Username: ")
             password = input("Password: ")
+            if not username or not password: continue
             data, MIC  = self.cipher({"username": username, "password": password})
             req = requests.post(f'{self.SERVER_URL}/api/auth', data = data, headers = {'mic': MIC, 'sessionid': self.sessionid.bytes})
-
+            reqResp = self.processResponse(request = req)
             if req.status_code != 200:
-                print("\nBAD AUTHENTICATION! Try again...")
+                self.responseError(req, reqResp)
             else:
                 print("\nAUTHENTICATION SUCCESSFUL!")
                 break
@@ -306,7 +307,7 @@ class MediaClient:
             message = data['error']
         else:
             message = f"Invalid response: {str(data)}"
-        print(f"ERROR! Received response with code {request.status_code}: {message}")
+        print(f"\nERROR! Received response with code {request.status_code}: {message}")
         
 
         

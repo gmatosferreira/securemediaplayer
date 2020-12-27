@@ -66,12 +66,6 @@ def client_chosen_options(protocols):
     
     return cipherSuite
 
-def user_login(server_url, sessionid):
-    username = input("Username: ")
-    password = input("Password: ")
-    login_data  = {"username": self.username, "password": self.password}
-    requests.post(f'{self.SERVER_URL}/api/newLicense', data = login_data)
-
 """
 def user_logout(self):
     requests.post(f'{self.SERVER_URL}/api/update_license', data = {"username": self.username})
