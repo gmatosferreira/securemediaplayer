@@ -128,7 +128,8 @@ class CryptoFunctions:
     """
     This method checks and applys a digest function to a given message
     The default size is 256
-    return: message with diggest
+    --- Returns
+    digest      bytes
     """
     @staticmethod
     def create_digest(message, digst_algorithm):

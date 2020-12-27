@@ -58,18 +58,17 @@ class MediaServer(resource.Resource):
 
     # Send the server public key
     def do_parameters(self, request):
-        request.responseHeaders.addRawHeader(b"content-type", b"application/json")
         # Convert parameters to bytes
         pr = self.parameters.parameter_bytes(
             encoding = serialization.Encoding.PEM,
             format = serialization.ParameterFormat.PKCS3
         )
         print("\nSerialized parameters as bytes to answer request!\n", pr)
-
         # Return it
-        return json.dumps({
-            'parameters': pr.decode('utf-8')
-        }).encode('latin')
+        return self.rawResponse(
+            request = request,
+            response = {'parameters': pr.decode('utf-8')}
+        )
 
     # Send the list of available protocols
     def do_choose_protocols(self, request):
@@ -78,9 +77,10 @@ class MediaServer(resource.Resource):
             'digests': ['SHA512', 'BLAKE2'], 
             'cipher_mode': ['CBC', 'OFB']  
         }
-        
-        request.responseHeaders.addRawHeader(b"content-type", b"application/json")
-        return json.dumps(protocols).encode('latin')
+        return self.rawResponse(
+            request = request,
+            response = protocols
+        )
 
 
     # Send the list of media files to clients
@@ -104,9 +104,10 @@ class MediaServer(resource.Resource):
                 })
 
         # Return list to client
-        request.responseHeaders.addRawHeader(b"content-type", b"application/json")
-        message = json.dumps(media_list).encode()
-        return self.cipher(request, message)
+        return self.cipherResponse(
+            request = request, 
+            message = media_list
+        )
 
 
     # Send a media chunk to the client
@@ -118,20 +119,24 @@ class MediaServer(resource.Resource):
 
         # Check if the media_id is not None as it is required
         if media_id is None:
-            request.setResponseCode(400)
-            request.responseHeaders.addRawHeader(b"content-type", b"application/json")
-            message = json.dumps({'error': 'invalid media id'}).encode()
-            return self.cipher(request, message, bytes(chunk_id))
+            return self.cipherResponse(
+                request = request, 
+                message = {'error': 'invalid media id'}, 
+                append = bytes(chunk_id),
+                error = True
+            )
         
         # Convert bytes to str
         media_id = media_id.decode('latin')
 
         # Search media_id in the catalog
         if media_id not in CATALOG:
-            request.setResponseCode(404)
-            request.responseHeaders.addRawHeader(b"content-type", b"application/json")
-            message = json.dumps({'error': 'media file not found'}).encode()
-            return self.cipher(request, message, bytes(chunk_id))
+            return self.cipherResponse(
+                request = request, 
+                message = {'error': 'media file not found'}, 
+                append = bytes(chunk_id),
+                error = True
+            )
         
         # Get the media item
         media_item = CATALOG[media_id]
@@ -151,10 +156,13 @@ class MediaServer(resource.Resource):
             logger.warn("Chunk format is invalid")
 
         if not valid_chunk:
-            request.setResponseCode(400)
-            request.responseHeaders.addRawHeader(b"content-type", b"application/json")
-            message = json.dumps({'error': 'invalid chunk id'}).encode()
-            return self.cipher(request, message, bytes(chunk_id))
+            return self.cipherResponse(
+                request = request, 
+                message = {'error': 'invalid chunk id'}, 
+                append = bytes(chunk_id),
+                error = True
+            )
+            
             
         logger.debug(f'Download: chunk: {chunk_id}')
 
@@ -164,21 +172,25 @@ class MediaServer(resource.Resource):
         with open(os.path.join(CATALOG_BASE, media_item['file_name']), 'rb') as f:
             f.seek(offset)
             data = f.read(CHUNK_SIZE)
-
-            request.responseHeaders.addRawHeader(b"content-type", b"application/json")
-            message = json.dumps(
-                {
-                    'media_id': media_id, 
-                    'chunk': chunk_id, 
-                    'data': binascii.b2a_base64(data).decode('latin').strip()
-                }
-            ).encode()
-            return self.cipher(request, message, bytes(chunk_id))
+            message = {
+                'media_id': media_id, 
+                'chunk': chunk_id, 
+                'data': binascii.b2a_base64(data).decode('latin').strip()
+            }
+            return self.cipherResponse(
+                request = request, 
+                message = message, 
+                append = bytes(chunk_id)
+            )
+            
 
         # File was not open?
-        request.responseHeaders.addRawHeader(b"content-type", b"application/json")
-        message = json.dumps({'error': 'unknown'}).encode()
-        return self.cipher(request, message, bytes(chunk_id))
+        return self.cipherResponse(
+            request = request, 
+            message = {'error': 'unknown'}, 
+            append = bytes(chunk_id),
+            error = True
+        )
 
     # Handle a GET request
     def render_GET(self, request):
@@ -276,7 +288,8 @@ class MediaServer(resource.Resource):
             'shared_key': shared_key,
             'cipher': CIPHER,
             'digest': DIGEST,
-            'mode': CIPHER_MODE
+            'mode': CIPHER_MODE,
+            'authenticated': False
         }
 
         # 7. Return public key to client
@@ -285,6 +298,48 @@ class MediaServer(resource.Resource):
             'public_key': pk.decode('utf-8'),
         }).encode('latin')
     
+    """
+    This method handles the client authentication
+    """
+    def do_auth(self, request):
+        # Get data from request header
+        print("\n\nAUTHENTICATION")
+        headers = request.getAllHeaders()
+        session = uuid.UUID(bytes=headers[b'sessionid'])
+        print("Session", session)
+        MIC = headers[b'mic']
+
+        # Validate that client has open session
+        if session not in self.sessions.keys():
+            return self.rawResponse(
+                request = request,
+                response = {'error': 'Client does not have a valid session!'},
+                error = True
+            )
+
+        # Decipher payload
+        print("\nDecyphering payload...")
+        data = self.decipher(request, MIC, self.sessions[session])
+
+        if not data:
+            request.setResponseCode(400)
+            request.responseHeaders.addRawHeader(b"content-type", b"application/json")
+            message = json.dumps()
+            return self.cipherResponse(
+                request = request, 
+                message = {'error': 'Payload is not valid!'}, 
+                sessioninfo = self.sessions[session],
+                error = True
+            )
+            
+        print(data)
+        
+        # Authenticate user
+        # TODO
+
+        return None
+                
+
     #login and create new license
     
     def new_license(self, request):
@@ -315,6 +370,8 @@ class MediaServer(resource.Resource):
                 return self.process_negotiation(request)
             elif request.path == b'/api/register':
                 return self.do_register(request)
+            elif request.path == b'/api/auth':
+                return self.do_auth(request)
             elif request.path == b'/api/newLicense':
                 return self.new_license(request)
 
@@ -326,29 +383,102 @@ class MediaServer(resource.Resource):
             request.responseHeaders.addRawHeader(b"content-type", b"text/plain")
             return b''
 
-    # Cipher
-    def cipher(self, request, response, append=None):
+    # Responses
+    def cipherResponse(self, request, response, sessioninfo, append = None, error = False):
         """
         This method ciphers a response to a request
         It also generates a MIC for the cryptogram
         --- Parameters
-        append      Bytes to append to shared_key before ciphering
+        request     
+        response        A Python object to send encrypted as response
+        sessioninfo     Client session data
+        append          Bytes to append to shared_key before ciphering
+        error           If error, set response code to 400
+        --- Returns
+        cryptogram      The response encrypted
         """
+        print("\nAnswering...", response)
+        if not response: return None
+        # Convert Python Object to str and then to bytes
+        message = json.dumps(response).encode()
+        print("\nSerialized to...", message)
+        # Encrypt
         cryptogram = CryptoFunctions.symetric_encryption(
-            key = self.shared_key if not append else self.shared_key + append,
-            message = response,
-            algorithm_name = self.CIPHER,
-            cypher_mode = self.CIPHER_MODE,
-            digest_mode = self.DIGEST,
+            key = sessioninfo['shared_key'] if not append else sessioninfo['shared_key'] + append,
+            message = message,
+            algorithm_name = sessioninfo['cipher'],
+            cypher_mode = sessioninfo['mode'],
+            digest_mode = sessioninfo['digest'],
             encode = True
         )
-
-        MIC = CryptoFunctions.create_digest(cryptogram, self.DIGEST)
-        print("Generated MIC:\n",MIC)
-        request.responseHeaders.addRawHeader(b"MIC", MIC)
-        print(request.responseHeaders)
-
+        # Generate MIC
+        MIC = CryptoFunctions.create_digest(cryptogram, sessioninfo['digest'])
+        print("\nGenerated MIC:\n", MIC)
+        # Add headers
+        request.responseHeaders.addRawHeader(b"mic", MIC)
+        request.responseHeaders.addRawHeader(b"ciphered", str(ciphered))
+        request.responseHeaders.addRawHeader(b"content-type", b"application/json")
+        if error:
+            request.setResponseCode(400)
+        # Return cryptogram
         return cryptogram
+
+    def rawResponse(self, request, response, error = False):
+        """
+        This method returns a raw response to a request
+        It also generates a pseudo MIC (hash) for the cryptogram
+        --- Parameters
+        request     
+        response        A Python object to send encrypted as response
+        error           If error, set response code to 400
+        --- Returns
+        cryptogram      The response encrypted
+        """
+        print("\nAnswering...", response)
+        if not response: return None
+        # Convert Python Object to str and then to bytes
+        message = json.dumps(response).encode().strip()
+        print("\nSerialized to...", message)
+        print("\nType of serialized...", type(message))
+        # Generate pseudo MIC
+        MIC = str(str(message).__hash__()).encode('latin')
+        print("\nGenerated pseudo MIC:\n", MIC)
+        # Add headers
+        request.responseHeaders.addRawHeader(b"mic", MIC)
+        request.responseHeaders.addRawHeader(b"ciphered", b'False')
+        request.responseHeaders.addRawHeader(b"content-type", b"application/json")
+        if error:
+            request.setResponseCode(400)
+        # Return message
+        return message
+
+
+    def decipher(self, request, RMIC, sessioninfo):
+        """
+        Validates the MIC sent on the header 
+        Deciphers the criptogram on the request content with the ket given
+        """
+
+        print("\nDeciphering request...\n", request.content.getvalue().strip())
+        print("\nGot MIC...\n", RMIC)
+
+        MIC = CryptoFunctions.create_digest(request.content.getvalue().strip(), sessioninfo['digest']).strip()
+        print("\nMIC computed...\n", MIC)
+        
+        if MIC != RMIC:
+            print("INVALID MIC!")
+            return None
+        else:
+            print("Validated MIC!")
+
+        return CryptoFunctions.symetric_encryption( 
+            key = sessioninfo['shared_key'], 
+            message = request.content.getvalue(), 
+            algorithm_name = sessioninfo['cipher'], 
+            cypher_mode = sessioninfo['mode'], 
+            digest_mode = sessioninfo['digest'], 
+            encode = False 
+        ) 
 
 
 print("Server started")
