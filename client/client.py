@@ -60,6 +60,7 @@ class MediaClient:
         ))
 
         # Initialize other vars
+        self.sessionid = None
         self.shared_key = None
         self.CIPHER = None
         self.DIGEST = None
@@ -79,14 +80,17 @@ class MediaClient:
         """
         Defines the cipher suite and negociates the shared key
         """
-        # 1. Negociate encription keys (Diffie-Hellman)
-        self.shared_key = diffieHellman(self.SERVER_URL, self.private_key, self.public_key)
-        print("\nGenerated the client shared key!\n", self.shared_key)
-        
         # 1. Let user choose chipher suite
         cipherSuite = client_chosen_options(self.SERVER_URL)
         self.CIPHER, self.DIGEST, self.CIPHERMODE = cipherSuite['cipher'], cipherSuite['digest'], cipherSuite['cipher_mode']
         print(f"\nCipher suite defined!\nCipher: {self.CIPHER}; DIGEST: {self.DIGEST}; CIPHERMODE: {self.CIPHERMODE}")
+        
+        # 2. Register client at server 
+        # Negociate encription keys (Diffie-Hellman)
+        self.sessionid, self.shared_key = registerClient(self.SERVER_URL, self.private_key, self.public_key, cipherSuite)
+        print("\nGenerated the client shared key!\n", self.shared_key)
+        
+
         #requests.post(f'{self.SERVER_URL}/api/suite', data = cipherSuite)
 
 
@@ -171,6 +175,32 @@ class MediaClient:
             except:
                 break
 
+    # Secrecy
+
+    # Cipher
+    def cipher(self, request, payload, append=None):
+        """
+        This method ciphers a request payload
+        It also generates a MIC for the cryptogram
+        --- Parameters
+        append      Bytes to append to shared_key before ciphering
+        """
+        cryptogram = CryptoFunctions.symetric_encryption(
+            key = self.shared_key if not append else self.shared_key + append,
+            message = payload,
+            algorithm_name = self.CIPHER,
+            cypher_mode = self.CIPHER_MODE,
+            digest_mode = self.DIGEST,
+            encode = True
+        )
+
+        MIC = CryptoFunctions.create_digest(cryptogram, self.DIGEST)
+        print("Generated MIC:\n",MIC)
+        request.responseHeaders.addRawHeader(b"MIC", MIC)
+        print(request.responseHeaders)
+
+        return cryptogram
+    
     def decipher(self, request, append=None):
         """
         Validates the MIC sent on the header 

@@ -110,11 +110,12 @@ in the communications with the server.
 server_url          The server base url
 private_key         The client private key
 public_key          The client public key
+cipherSuite         Cipher suite
 --- Returns
 sessionid           The session id
 shared_key          The client shared key
 """
-def diffieHellman(server_url, private_key, public_key):
+def registerClient(server_url, private_key, public_key, cipherSuite):
     
     # 1. Exchange public key with the server
     pk = public_key.public_bytes(
@@ -123,9 +124,9 @@ def diffieHellman(server_url, private_key, public_key):
     )
     print("\nSerialized public key to send server!\n", pk)
     # 1.1. Send the client public key to the server
-    req = requests.post(f'{server_url}/api/publickey', data={
-        'public_key': pk.decode('utf-8'),
-    })
+    data = cipherSuite
+    data['public_key'] = pk.decode('utf-8') 
+    req = requests.post(f'{server_url}/api/register', data=data)
 
     if req.status_code != 200:
         print("The server is not available!")

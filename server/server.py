@@ -52,13 +52,8 @@ class MediaServer(resource.Resource):
         with open('parameters', 'rb') as f:
             self.parameters = serialization.load_pem_parameters(f.read().strip())    
             print("Loaded parameters!")
-        # Create the private/public keys pairs
-        self.shared_key = None
 
-        self.CIPHER = None
-        self.DIGEST = None
-        self.CIPHER_MODE= None
-        self.KEY = None
+        # Initialize session dictionary
         self.sessions = {}
 
     # Send the server public key
@@ -224,17 +219,26 @@ class MediaServer(resource.Resource):
     It also generates a session id for client
     Answers to client the server public key and the session id
     """
-    def do_public_key(self, request):
+    def do_register(self, request):
         data = request.args
         if data == None or data == '':
             print('Data is none or empty')
             return 
         print(request.args) 
 
-        # 1. Get the client public key
+        # 1.1. Get the client public key
         print("\nClient public key raw.\n", request.args[b'public_key'][0])
         client_public_key = serialization.load_pem_public_key(request.args[b'public_key'][0])
         print("\nGot the client public key!\n", client_public_key)
+
+        # 1.2. Get the client cipher suite
+        CIPHER = request.args[b'cipher'][0].decode('utf-8')
+        DIGEST = request.args[b'digest'][0].decode('utf-8')
+        CIPHER_MODE = request.args[b'cipher_mode'][0].decode('utf-8')
+        print("\nGot client cipher suite!")
+        print("Cipher:", CIPHER)
+        print("Digest:", DIGEST)
+        print("Mode:", CIPHER_MODE)
 
         # 2. Generate a session id for client
         sessionid = uuid.uuid1()
@@ -269,7 +273,10 @@ class MediaServer(resource.Resource):
         self.sessions[sessionid] = {
             'public_key': public_key,
             'private_key': private_key,
-            'shared_key': shared_key
+            'shared_key': shared_key,
+            'cipher': CIPHER,
+            'digest': DIGEST,
+            'mode': CIPHER_MODE
         }
 
         # 7. Return public key to client
@@ -277,17 +284,6 @@ class MediaServer(resource.Resource):
         return json.dumps({
             'public_key': pk.decode('utf-8'),
         }).encode('latin')
-    
-    def process_negotiation(self,request):
-        data = request.args
-        
-        if data == None or data == '':
-            print('Data is none or empty')
-        else:
-            self.CIPHER = request.args[b'cipher'][0].decode('utf-8')
-            self.DIGEST = request.args[b'digest'][0].decode('utf-8')
-            self.CIPHER_MODE = request.args[b'cipher_mode'][0].decode('utf-8')
-            print(f"\n\nDefined chiper suite as:\nCipher: {self.CIPHER}\nDigest: {self.DIGEST}\nMode: {self.CIPHER_MODE}\n")
     
     #login and create new license
     
@@ -317,8 +313,8 @@ class MediaServer(resource.Resource):
         try:
             if request.path == b'/api/suite':
                 return self.process_negotiation(request)
-            elif request.path == b'/api/publickey':
-                return self.do_public_key(request)
+            elif request.path == b'/api/register':
+                return self.do_register(request)
             elif request.path == b'/api/newLicense':
                 return self.new_license(request)
 
