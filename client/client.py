@@ -177,6 +177,7 @@ class MediaClient:
             if req.status_code != 200:
                 self.responseError(req, reqResp)
             elif not registration:
+                self.logged = True
                 print("\nAUTHENTICATION SUCCESSFUL!")
                 break
             else:
@@ -195,15 +196,16 @@ class MediaClient:
 
         # 2. Get a list of media files
         print("Contacting Server...")
-        req = requests.get(f'{SERVER_URL}/api/list')
-        if req.status_code == 200:
-            print("Got Server List")
+        req = requests.get(f'{SERVER_URL}/api/list', headers = {'sessionid': self.sessionid.bytes})
+        reqResp = self.processResponse(req)
+        if req.status_code != 200:
+            self.responseError(req, reqResp)
+            return
         
-        print(req.headers)
-        media_list = self.processResponse(req)
+        media_list = reqResp
         if not media_list:
             return
-        print(media_list)
+        print("Got media list", media_list)
         
         # 3. Present a simple selection menu    
         idx = 0
@@ -241,15 +243,23 @@ class MediaClient:
 
             # Make request until gets a valid answer (max 5 times)
             for i in range(0,5):
-                req = requests.get(f'{SERVER_URL}/api/download?id={media_item["id"]}&chunk={chunk}')
-                
-                chunk = self.processResponse(req, bytes(chunk))
-                if chunk:
+                req = requests.get(f'{SERVER_URL}/api/download?id={media_item["id"]}&chunk={chunk}', headers = {'sessionid': self.sessionid.bytes})
+                media = self.processResponse(req, bytes(chunk))
+
+                if req.status_code != 200:
+                    self.responseError(req, media)
+                    continue
+
+                if media:
                     break
 
             # TODO: Process chunk
 
-            data = binascii.a2b_base64(chunk['data'].encode('latin'))
+            if not media:
+                print("\nGot empty chunk!!")
+                continue
+
+            data = binascii.a2b_base64(media['data'].encode('latin'))
             try:
                 proc.stdin.write(data)
             except:

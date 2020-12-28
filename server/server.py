@@ -56,7 +56,7 @@ class MediaServer(resource.Resource):
         # Initialize session dictionary
         self.sessions = {}
 
-    # Send the server public key
+    # Send the server DH parameters
     def do_parameters(self, request):
         # Convert parameters to bytes
         pr = self.parameters.parameter_bytes(
@@ -74,7 +74,7 @@ class MediaServer(resource.Resource):
     def do_choose_protocols(self, request):
         protocols = {
             'cipher': ['AES','3DEs'], 
-            'digests': ['SHA512', 'BLAKE2'], 
+            'digests': CryptoFunctions.digests, 
             'cipher_mode': ['CBC', 'OFB']  
         }
         return self.rawResponse(
@@ -90,6 +90,10 @@ class MediaServer(resource.Resource):
         #if not auth:
         #    request.setResponseCode(401)
         #    return 'Not authorized'
+        
+        # Validate session and log in
+        invalid, session = self.invalidSession(request)
+        if invalid: return invalid
 
         # Build list
         media_list = []
@@ -101,17 +105,23 @@ class MediaServer(resource.Resource):
                 'description': media['description'],
                 'chunks': math.ceil(media['file_size'] / CHUNK_SIZE),
                 'duration': media['duration']
-                })
+            })
 
         # Return list to client
         return self.cipherResponse(
             request = request, 
-            message = media_list
+            response = media_list,
+            sessioninfo = session
         )
 
 
     # Send a media chunk to the client
     def do_download(self, request):
+
+        # Validate session and log in
+        invalid, session = self.invalidSession(request)
+        if invalid: return invalid
+
         logger.debug(f'Download: args: {request.args}')
         
         media_id = request.args.get(b'id', [None])[0]
@@ -121,7 +131,8 @@ class MediaServer(resource.Resource):
         if media_id is None:
             return self.cipherResponse(
                 request = request, 
-                message = {'error': 'invalid media id'}, 
+                response = {'error': 'invalid media id'}, 
+                sessioninfo = session,
                 append = bytes(chunk_id),
                 error = True
             )
@@ -133,7 +144,8 @@ class MediaServer(resource.Resource):
         if media_id not in CATALOG:
             return self.cipherResponse(
                 request = request, 
-                message = {'error': 'media file not found'}, 
+                response = {'error': 'media file not found'}, 
+                sessioninfo = session,
                 append = bytes(chunk_id),
                 error = True
             )
@@ -158,7 +170,8 @@ class MediaServer(resource.Resource):
         if not valid_chunk:
             return self.cipherResponse(
                 request = request, 
-                message = {'error': 'invalid chunk id'}, 
+                response = {'error': 'invalid chunk id'}, 
+                sessioninfo = session,
                 append = bytes(chunk_id),
                 error = True
             )
@@ -179,7 +192,8 @@ class MediaServer(resource.Resource):
             }
             return self.cipherResponse(
                 request = request, 
-                message = message, 
+                response = message, 
+                sessioninfo = session,
                 append = bytes(chunk_id)
             )
             
@@ -187,7 +201,8 @@ class MediaServer(resource.Resource):
         # File was not open?
         return self.cipherResponse(
             request = request, 
-            message = {'error': 'unknown'}, 
+            response = {'error': 'unknown'}, 
+            sessioninfo = session,
             append = bytes(chunk_id),
             error = True
         )
@@ -494,7 +509,7 @@ class MediaServer(resource.Resource):
         """
         Gets the user session
         Validates the MIC sent on the header 
-        Deciphers the criptogram on the request content with the ket given
+        Deciphers the criptogram on the request content with the key given
         --- Parameters
         request
         --- Returns
@@ -504,15 +519,12 @@ class MediaServer(resource.Resource):
         print("\nProcessing request...")
 
         # Get session and validate it
-        headers = request.getAllHeaders()
-        sessionid = uuid.UUID(bytes=headers[b'sessionid'])
-        if sessionid not in self.sessions.keys():
-            print(f"\nInvalid session! ({sessionid})")
+        session = self.getSession(request)
+        if not session:
             return None, None
-        session = self.sessions[sessionid]
-        print("\nSession", sessionid)
-
+        
         # Get MIC and validate it
+        headers = request.getAllHeaders()
         RMIC = headers[b'mic']
         print("\nGot MIC...\n", RMIC)
         MIC = CryptoFunctions.create_digest(request.content.getvalue().strip(), session['digest']).strip()
@@ -533,7 +545,47 @@ class MediaServer(resource.Resource):
             digest_mode = session['digest'], 
             encode = False 
         ) 
-        return session, json.loads(message) 
+        return session, json.loads(message)
+
+    # Session management
+    def getSession(self, request):
+        """
+        This method gets the session for the token sent on request header
+        """
+        headers = request.getAllHeaders()
+        sessionid = uuid.UUID(bytes=headers[b'sessionid'])
+        if sessionid not in self.sessions.keys():
+            print(f"\nInvalid session! ({sessionid})")
+            return None
+        session = self.sessions[sessionid]
+        print("\nSession", sessionid)
+        return session
+
+    # Validate that client has open session
+    def invalidSession(self, request):
+        """
+        This method validates that the client has a valid session and is logged in
+        --- Returns 
+        response
+        session
+        """
+        session = self.getSession(request)
+        error = ""
+        if not session:
+            return self.rawResponse(
+                request = request,
+                response = {'error': 'Client does not have a valid session!'},
+                error = True
+            ), None
+        # If has session, must be logged
+        elif not session['authenticated']:
+            return self.cipherResponse(
+                request = request,
+                response = {'error': 'Client must be logged in to consume media!'},
+                sessioninfo = session,
+                error = True
+            ), None
+        return None, session
 
 
 print("Server started")
