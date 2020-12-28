@@ -359,9 +359,9 @@ class MediaClient:
 
         t = datetime.utcfromtimestamp(payload['time'])
         print("\n---- LICENSE ----")
-        print(f"Views: {payload['views']}")
+        print(f"Views: {payload['views']-1}")
         print(f"Until: {t}")
-        if t < datetime.now() or payload['views'] <= 0:
+        if t < datetime.now() or payload['views']-1 <= 0:
             print("EXPIRED!")
         print("-----------------\n")
 

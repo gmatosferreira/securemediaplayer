@@ -96,7 +96,7 @@ class MediaServer(resource.Resource):
         if invalid: return invalid
 
         # Validate license
-        if not licenseValid(session['data']):
+        if not licenseValid(session['username']):
             return self.cipherResponse(
                 request = request,
                 response = {'error': 'License is not valid! Please renew it.'},
@@ -132,7 +132,7 @@ class MediaServer(resource.Resource):
         if invalid: return invalid
 
         # Validate license
-        if not licenseValid(session['data']):
+        if not licenseValid(session['username']):
             return self.cipherResponse(
                 request = request,
                 response = {'error': 'License is not valid! Please renew it.'},
@@ -187,10 +187,8 @@ class MediaServer(resource.Resource):
 
         # Update license for first chunk (decrement views)
         if chunk_id==0:
-            user = updateLicense(session['data']['username'], view=True)
-            if user: 
-                session['data'] = user
-            else:
+            user = updateLicense(session['username'], view=True)
+            if not user:
                 return self.cipherResponse(
                     request = request,
                     response = {'error': 'There was an error updating the license. Try again!'},
@@ -246,12 +244,13 @@ class MediaServer(resource.Resource):
         invalid, session = self.invalidSession(request)
         if invalid: return invalid
 
+        license = getLicense(session['username'])
         return self.cipherResponse(
             request = request, 
             response = {
                 'success': 'Here is your license! :)',
-                'views': session['data']['views'],
-                'time': session['data']['time'],
+                'views': license['views'],
+                'time': license['time'],
             }, 
             sessioninfo = session
         )
@@ -417,8 +416,6 @@ class MediaServer(resource.Resource):
                 request = request, 
                 response = {
                     'success': 'The user is already logged!',
-                    'views': session['data']['views'],
-                    'time': session['data']['time']
                 }, 
                 sessioninfo = session,
             )
@@ -433,16 +430,14 @@ class MediaServer(resource.Resource):
         if userData:
             if not registration:
                 session['authenticated'] = True
-                session['data'] = userData
+                session['username'] = userData['username']
                 message = 'The user was authenticated sucessfully!'
             else:
                 message = 'The user was registered sucessfully!'
             return self.cipherResponse(
                 request = request, 
                 response = {
-                    'success': message,
-                    'views': userData['views'],
-                    'time': userData['time']
+                    'success': message
                 }, 
                 sessioninfo = session,
             )
@@ -519,10 +514,7 @@ class MediaServer(resource.Resource):
 
 
         # Renew it
-        user = updateLicense(session['data']['username'], renew=True)
-
-        # Update session
-        session['data'] = user
+        user = updateLicense(session['username'], renew=True)
 
         if not user:
             return self.cipherResponse(
@@ -539,7 +531,7 @@ class MediaServer(resource.Resource):
             response = {
                 'success': 'The license was successfully renewed!',
                 'views': user['views'],
-                'time': user['time'],
+                'time': user['time']
             },
             sessioninfo = session,
         )
@@ -693,6 +685,7 @@ class MediaServer(resource.Resource):
             return None
         session = self.sessions[sessionid]
         print("\nSession", sessionid)
+        print(session)
         return session
 
     # Validate that client has open session

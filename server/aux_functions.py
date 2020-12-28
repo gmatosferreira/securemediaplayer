@@ -7,7 +7,7 @@ from crypto_functions import CryptoFunctions
 
 import datetime
 
-LICENSE_VIEWS = 3
+LICENSE_VIEWS = 4
 LICENSE_SPAN = datetime.timedelta(minutes=5)
 
 def register(username, password):
@@ -54,12 +54,28 @@ def register(username, password):
 
     return user
 
-def licenseValid(license):
+def getLicense(username):
+    """
+    This method returns a license for a user given his username
+    """
+    # Load users
+    users = json.load(open('../licenses.json', 'r'))
+
+    # Find user on file
+    for u in users:
+        if u['username'] == username:
+            return u
+
+    return None
+
+def licenseValid(username):
     """
     Given a license, this method tells if it is valid
     """    
+    license = getLicense(username)
+
     # Validate attributes
-    if not all(attr in license and license[attr] for attr in ['views', 'time']):
+    if not license or not all(attr in license and license[attr] for attr in ['views', 'time']):
         return False
     # Check that license has not expired yet
     t = datetime.datetime.utcfromtimestamp(license['time'])
