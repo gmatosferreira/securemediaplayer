@@ -9,6 +9,7 @@ from datetime import datetime
 
 import sys
 from aux_functions import *
+from cc import CitizenCard
 
 # Serialization
 from cryptography.hazmat.primitives import serialization
@@ -182,6 +183,8 @@ class MediaClient:
         """
         This method handles the client authentication (or registration) at server
         """
+        cc = CitizenCard() 
+        
         url = f'{self.SERVER_URL}/api/auth' if not registration else f'{self.SERVER_URL}/api/newuser'
         while True:
             username = input("Username (ENTER to exit): ")
