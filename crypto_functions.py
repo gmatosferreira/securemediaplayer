@@ -10,6 +10,8 @@ from cryptography.fernet import Fernet
 
 class CryptoFunctions:
 
+    digests = ['SHA512', 'BLAKE2']
+
     """
     This method handles the creation of private/public keys pair
     --- Returns
@@ -138,7 +140,7 @@ class CryptoFunctions:
         if digst_algorithm == "SHA512":
             hash_algorithm = hashes.SHA512_256()
         elif digst_algorithm == "BLAKE2":
-            hash_algorithm = hashes.BLAKE2b(256)
+            hash_algorithm = hashes.BLAKE2b(64)
         else:
             print("Digest Algorithm name not founded! ")
         

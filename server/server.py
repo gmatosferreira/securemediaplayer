@@ -7,6 +7,7 @@ import json
 import os
 import math
 import uuid
+from aux_functions import *
 
 # Serialization
 from cryptography.hazmat.primitives import serialization
@@ -18,7 +19,6 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 import sys
 sys.path.append('..')
-
 from crypto_functions import CryptoFunctions
 from licenses import *
 
@@ -297,14 +297,18 @@ class MediaServer(resource.Resource):
         return json.dumps({
             'public_key': pk.decode('utf-8'),
         }).encode('latin')
+
     
     """
     This method handles the client authentication
     To authenticate, the client must have started a session!
     """
-    def do_auth(self, request):
+    def do_auth(self, request, registration = False):
         # Get data from request header
-        print("\n\nAUTHENTICATION")
+        if not registration:
+            print("\n\nAUTHENTICATION")
+        else:
+            print("\n\nREGISTRATION")
 
         # Process request 
         # (Get session and decipher payload)
@@ -319,22 +323,53 @@ class MediaServer(resource.Resource):
             )
 
         # Validate that payload has data
-        if not data:
+        if not data or not all(attr in data and data[attr] for attr in ['username', 'password']):
             return self.cipherResponse(
                 request = request, 
                 response = {'error': 'Payload is not valid!'}, 
                 sessioninfo = session,
                 error = True
             )
-            
-        print("\nAuthentication data is...\n", data)
         
-        # Authenticate user
-        # TODO
+        # Check that user is already logged on authentication
+        if not registration and session['authenticated']:
+            return self.cipherResponse(
+                request = request, 
+                response = {
+                    'success': 'The user is already logged!',
+                    'views': session['data']['views'],
+                    'time': session['data']['time']
+                }, 
+                sessioninfo = session,
+            )
+            
+        print("\nData received is...\n", data)
+        # Validate data
+        if not registration:
+            userData = authenticate(data['username'], data['password'], session)
+        else:
+            userData = register(data['username'], data['password'])
+        # If authenticated/registered sucessfully
+        if userData:
+            if not registration:
+                session['authenticated'] = True
+                session['data'] = userData
+                message = 'The user was authenticated sucessfully!'
+            else:
+                message = 'The user was registered sucessfully!'
+            return self.cipherResponse(
+                request = request, 
+                response = {
+                    'success': message,
+                    'views': userData['views'],
+                    'time': userData['time']
+                }, 
+                sessioninfo = session,
+            )
 
         return self.cipherResponse(
             request = request, 
-            response = {'error': 'The authentication data is not valid!'}, 
+            response = {'error': 'The sent data is not valid!'}, 
             sessioninfo = session,
             error = True
         )
@@ -370,6 +405,8 @@ class MediaServer(resource.Resource):
                 return self.process_negotiation(request)
             elif request.path == b'/api/register':
                 return self.do_register(request)
+            elif request.path == b'/api/newuser':
+                return self.do_auth(request, registration=True)
             elif request.path == b'/api/auth':
                 return self.do_auth(request)
             elif request.path == b'/api/newLicense':

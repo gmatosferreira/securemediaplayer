@@ -72,6 +72,7 @@ class MediaClient:
         self.CIPHER = None
         self.DIGEST = None
         self.CIPHERMODE = None
+        self.logged = False
     
     def start(self):
         """
@@ -122,23 +123,67 @@ class MediaClient:
         self.shared_key = self.private_key.exchange(server_public_key)
         print("\nGenerated the client shared key!\n", self.shared_key)
 
-        # 3. Authenticate at server
+    def run(self):
+        print("|--------------------------------------|")
+        print("|       SECURE MEDIA CLIENT MENU       |")
+        print("|                                      |")
+        if not self.logged:
+            print("| 1. Login                             |")
+            print("| 2. Register                          |")
+        else:
+            print("| 1. Log out                           |")
+        print("| 3. Play media                        |")
+        print("|--------------------------------------|\n")
+
+        op = int(input("What is your option? "))
+
+        if op == 1:
+            if not self.logged:
+                print("\nAUTHENTICATION")
+                self.auth()
+            else:
+                print("\nLOG OUT")
+                print("This function is not implemented yet! :(")
+        elif op == 2:
+            print("\nREGISTER")
+            self.auth(registration=True)
+        elif op == 3:
+            print("\nPLAY")
+            self.play()
+        else:
+            print("Invalid option!")
+
+    def auth(self, registration = False):
+        """
+        This method handles the client authentication (or registration) at server
+        """
+        url = f'{self.SERVER_URL}/api/auth' if not registration else f'{self.SERVER_URL}/api/newuser'
         while True:
-            print("\nAUTHENTICATION")
-            username = input("Username: ")
-            password = input("Password: ")
-            if not username or not password: continue
-            data, MIC  = self.cipher({"username": username, "password": password})
-            req = requests.post(f'{self.SERVER_URL}/api/auth', data = data, headers = {'mic': MIC, 'sessionid': self.sessionid.bytes})
+            username = input("Username (ENTER to exit): ")
+            password = input("Password (ENTER to exit): ")
+            if not username or not password: break
+            # Create digest for password
+            if not registration:
+                passwordDigest = CryptoFunctions.create_digest(password.encode('latin'), self.DIGEST).decode('latin')
+            else:
+                passwordDigest = password
+            print("Password digest: ", passwordDigest)
+            # Create payload
+            data, MIC  = self.cipher({"username": username, "password": passwordDigest})
+            # POST to server
+            req = requests.post(url, data = data, headers = {'mic': MIC, 'sessionid': self.sessionid.bytes})
+            # Process server response
             reqResp = self.processResponse(request = req)
             if req.status_code != 200:
                 self.responseError(req, reqResp)
-            else:
+            elif not registration:
                 print("\nAUTHENTICATION SUCCESSFUL!")
                 break
+            else:
+                print("\nREGISTRATION SUCCESSFUL!")
+                break
 
-
-    def run(self):
+    def play(self):
         """
         This method is used to play the media content from the server
         """
@@ -149,7 +194,7 @@ class MediaClient:
             return
 
         # 2. Get a list of media files
-        print("Contacting Server")
+        print("Contacting Server...")
         req = requests.get(f'{SERVER_URL}/api/list')
         if req.status_code == 200:
             print("Got Server List")
