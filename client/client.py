@@ -125,6 +125,13 @@ class MediaClient:
         print("\nGenerated the client shared key!\n", self.shared_key)
 
     def run(self):
+        # 1. Validate that client has already been started
+        required = [self.shared_key, self.CIPHER, self.DIGEST, self.CIPHERMODE]
+        if not all([a for a in required]):
+            print("ERROR! The client can't be run without having been started first!")
+            return
+        
+        # 2. Show menu
         print("|--------------------------------------|")
         print("|       SECURE MEDIA CLIENT MENU       |")
         print("|                                      |")
@@ -208,13 +215,7 @@ class MediaClient:
         """
         This method is used to play the media content from the server
         """
-        # 1. Validate that client has already been started
-        required = [self.shared_key, self.CIPHER, self.DIGEST, self.CIPHERMODE]
-        if not all([a for a in required]):
-            print("ERROR! The client can't be run without having been started first!")
-            return
-
-        # 2. Get a list of media files
+        # 1. Get a list of media files
         print("Contacting Server...")
         req = requests.get(f'{SERVER_URL}/api/list', headers = {'sessionid': self.sessionid.bytes})
         reqResp = self.processResponse(req)
@@ -227,7 +228,7 @@ class MediaClient:
             return
         print("Got media list", media_list)
         
-        # 3. Present a simple selection menu    
+        # 2. Present a simple selection menu    
         idx = 0
         print("MEDIA CATALOG\n")
         for item in media_list:
