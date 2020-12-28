@@ -225,6 +225,26 @@ class MediaServer(resource.Resource):
             error = True
         )
 
+    def do_license(self, request):
+        """
+        This method allows the client to look up his license status
+        """
+        # Validate session and log in
+        invalid, session = self.invalidSession(request)
+        if invalid: return invalid
+
+        return self.cipherResponse(
+            request = request, 
+            response = {
+                'success': 'Here is your license! :)',
+                'views': session['data']['views'],
+                'time': session['data']['time'],
+            }, 
+            sessioninfo = session
+        )
+
+
+
     # Handle a GET request
     def render_GET(self, request):
         logger.debug(f'\nReceived request for {request.uri}')
@@ -237,13 +257,12 @@ class MediaServer(resource.Resource):
             #elif request.uri == 'api/key':
             #...
             #elif request.uri == 'api/auth':
-
             elif request.path == b'/api/list':
                 return self.do_list(request)
-
             elif request.path == b'/api/download':
-                print("OK")
                 return self.do_download(request)
+            elif request.path == b'/api/license':
+                return self.do_license(request)
                 
        
             
@@ -488,6 +507,9 @@ class MediaServer(resource.Resource):
 
         # Renew it
         user = renewLicense(session['data']['username'])
+
+        # Update session
+        session['data'] = user
 
         if not user:
             return self.cipherResponse(

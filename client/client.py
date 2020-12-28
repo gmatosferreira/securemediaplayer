@@ -134,8 +134,9 @@ class MediaClient:
         else:
             print("| 1. Log out                           |")
         print("| 3. Play media                        |")
-        print("| 4. Renew license                     |")
-        print("| 5. Exit                              |")
+        print("| 4. Look up license                   |")
+        print("| 5. Renew license                     |")
+        print("| 6. Exit                              |")
         print("|--------------------------------------|\n")
 
         op = int(input("What is your option? "))
@@ -154,9 +155,12 @@ class MediaClient:
             print("\nPLAY")
             self.play()
         elif op == 4:
+            print("\nLICENSE")
+            self.license()
+        elif op == 5:
             print("\nRENEW LICENSE")
             self.renew()
-        elif op == 5:
+        elif op == 6:
             print("\nEXIT")
             print("Closing session...")
             if self.closeSession():
@@ -296,6 +300,19 @@ class MediaClient:
             self.logged = False
             print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
 
+    def license(self):
+        """
+        This method allows the client to look up his license status
+        """
+        req = requests.get(f'{SERVER_URL}/api/license', headers = {'sessionid': self.sessionid.bytes})
+        reqResp = self.processResponse(req)
+        if req.status_code != 200:
+            self.responseError(req, reqResp)
+            return
+
+        self.showLicense(reqResp)
+
+
     def renew(self):
         """
         This method allows the client to renew his certificate with the server
@@ -309,6 +326,7 @@ class MediaClient:
             self.responseError(req, reqResp)
         else:
             print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
+            self.showLicense(reqResp)
 
 
     def closeSession(self):
@@ -336,7 +354,7 @@ class MediaClient:
         It must have the attrs 'views' and 'time'
         """
         # Validate that required attrs are given
-        if not all(attr in payload and payload[attr] for attr in ['views', 'time']):
+        if not payload or not all(attr in payload and payload[attr] for attr in ['views', 'time']):
             return
 
         t = datetime.utcfromtimestamp(payload['time'])
