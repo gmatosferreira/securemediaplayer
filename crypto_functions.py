@@ -10,6 +10,8 @@ from cryptography.fernet import Fernet
 
 class CryptoFunctions:
 
+    digests = ['SHA512', 'BLAKE2']
+
     """
     This method handles the creation of private/public keys pair
     --- Returns
@@ -128,7 +130,8 @@ class CryptoFunctions:
     """
     This method checks and applys a digest function to a given message
     The default size is 256
-    return: message with diggest
+    --- Returns
+    digest      bytes
     """
     @staticmethod
     def create_digest(message, digst_algorithm):
@@ -137,7 +140,7 @@ class CryptoFunctions:
         if digst_algorithm == "SHA512":
             hash_algorithm = hashes.SHA512_256()
         elif digst_algorithm == "BLAKE2":
-            hash_algorithm = hashes.BLAKE2b(256)
+            hash_algorithm = hashes.BLAKE2b(64)
         else:
             print("Digest Algorithm name not founded! ")
         
@@ -153,8 +156,8 @@ class CryptoFunctions:
 
         if digst_algorithm == "SHA512":
             hash_algorithm = hashes.SHA512()
-        elif algorithm == "BLAKE2":
-            digst_algorithm = hashes.BLAKE2b(64)
+        elif digst_algorithm == "BLAKE2":
+            hash_algorithm = hashes.BLAKE2b(64)
         else:
             raise Exception("Digest Algorithm name not founded!")
 
@@ -297,53 +300,7 @@ class CryptoFunctions:
 
         return True
     
-    """
-    def license_exists(username):
-        with open('licenses.txt') as licenses_file:
-        licenseData = json.load(licenses_file)
-        for license in licenseData['availableLicenses']:
-            if license['name'] == username:
-                print("Username Exists")
-                return True, license
-            
-    #Fernet modo de encriptacao
-    def encrypt_password(message, key):
-        return Fernet(key).encrypt(message)
-    
-    def decrypt_password(token, key):
-        return Fernet(key).decrypt(token)      
-    
-     
-
-    @staticmethod
-    def licences(user, password):
-        username = input("Username: ")
-        password = input("Password: ")
-        
-        userExist, license = license_exists(username)
-        if userExist:
-            username = license['username']
-            token = _
-            password = decrypt_password(token, license['password']).decode()
-            time = license['time']
-            numOfViwes = license['numOfViwes']
-            #TODO
-            #contar tempos, ver se ele esta ou n logado e ver number os views
-            
-            
-        else:
-            # each user has a usage time of 1 hour and 10 number os views
-            licenseData = {}
-            licenseData['availableLicenses'].append({
-                'username': username,
-                'password': encrypt_password(password.encode()),
-                'time:' 60,
-                'numOfViwes': 10
-            })
-            
-            with open('licenses.txt', 'w') as newLicense:
-                json.dump(licenseData, newLicense)
-    """
+   
             
 
         

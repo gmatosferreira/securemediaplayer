@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import time
+from datetime import datetime
 
 import sys
 from aux_functions import *
@@ -38,15 +39,22 @@ class MediaClient:
         print("|--------------------------------------|\n")
 
         self.SERVER_URL = SERVER_URL
-
-        # 1. Define the client private and public keys
         print("Initializing client...")
-        self.parameters = ask_server_parameters(self.SERVER_URL)
+
+        # 1. Get DH parameters from server 
+        req = requests.get(f'{self.SERVER_URL}/api/parameters')
+        data = self.processResponse(
+            request = req,
+            ciphered = False
+        )
+        if req.status_code != 200:
+            self.responseError(req, data)
+            exit()
+        self.parameters = serialization.load_pem_parameters(bytes(data['parameters'], 'utf-8'))   
         print("\nGot parameters\n", self.parameters)
 
         # 2. Generate the client private and public keys
         self.private_key, self.public_key = CryptoFunctions.newKeys(self.parameters)
-
         print("\nPrivate key created!\n", self.private_key)
         print(self.private_key.private_bytes(
             encoding = serialization.Encoding.PEM,
@@ -60,26 +68,143 @@ class MediaClient:
         ))
 
         # Initialize other vars
+        self.sessionid = None
         self.shared_key = None
         self.CIPHER = None
         self.DIGEST = None
         self.CIPHERMODE = None
-
+        self.logged = False
+    
     def start(self):
         """
-        Defines the cipher suite and negociates the shared key
+        Defines the cipher suite, negociates the shared key and authenticates the user at the server
         """
         # 1. Let user choose chipher suite
-        cipherSuite = client_chosen_options(self.SERVER_URL)
+        # 1.1. Ask server for available protocols 
+        req = requests.get(f'{self.SERVER_URL}/api/protocols')            
+        data = self.processResponse(
+            request = req,
+            ciphered = False
+        )
+        if req.status_code != 200:
+            self.responseError(req, data)
+            exit()   
+        # 1.2. Let user choose the cipher suite to use
+        cipherSuite = client_chosen_options(data)
         self.CIPHER, self.DIGEST, self.CIPHERMODE = cipherSuite['cipher'], cipherSuite['digest'], cipherSuite['cipher_mode']
-        requests.post(f'{self.SERVER_URL}/api/suite', data = cipherSuite)
         print(f"\nCipher suite defined!\nCipher: {self.CIPHER}; DIGEST: {self.DIGEST}; CIPHERMODE: {self.CIPHERMODE}")
+        
+        # 2. Register client at server and negociate encription keys (Diffie-Hellman)
 
-        # 2. Negociate encription keys (Diffie-Hellman)
-        self.shared_key = diffieHellman(self.SERVER_URL, self.private_key, self.public_key)
+        # 2.1. Exchange public key with the server
+        pk = self.public_key.public_bytes(
+            encoding = serialization.Encoding.PEM,
+            format = serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+        print("\nSerialized public key to send server!\n", pk)
+        data = cipherSuite
+        data['public_key'] = pk.decode('utf-8') 
+        req = requests.post(f'{self.SERVER_URL}/api/session', data=data)
+        reqdata = self.processResponse(
+            request = req,
+            ciphered = False
+        )
+        if req.status_code != 200:
+            self.responseError(req, reqdata)
+            exit()
+        # 2.1.1. Get the session id
+        self.sessionid = uuid.UUID(bytes=req.headers['sessionid'].encode('latin'))
+        print("\nGot session id...\n", self.sessionid)
+        # 2.1.2. Get the server public key as an answer to the POST request
+        server_public_key_bytes = bytes(reqdata['public_key'], 'utf-8')
+        server_public_key = serialization.load_pem_public_key(server_public_key_bytes)
+        print("\nGot the server public key!\n", server_public_key)
+
+        # 2.2. Generate the shared key based on the server public key
+        self.shared_key = self.private_key.exchange(server_public_key)
         print("\nGenerated the client shared key!\n", self.shared_key)
-    
+
     def run(self):
+        print("|--------------------------------------|")
+        print("|       SECURE MEDIA CLIENT MENU       |")
+        print("|                                      |")
+        if not self.logged:
+            print("| 1. Login                             |")
+            print("| 2. Register                          |")
+        else:
+            print("| 1. Log out                           |")
+        print("| 3. Play media                        |")
+        print("| 4. Look up license                   |")
+        print("| 5. Renew license                     |")
+        print("| 6. Exit                              |")
+        print("|--------------------------------------|\n")
+
+        op = int(input("What is your option? "))
+
+        if op == 1:
+            if not self.logged:
+                print("\nAUTHENTICATION")
+                self.auth()
+            else:
+                print("\nLOG OUT")
+                self.logout()
+        elif op == 2:
+            print("\nREGISTER")
+            self.auth(registration=True)
+        elif op == 3:
+            print("\nPLAY")
+            self.play()
+        elif op == 4:
+            print("\nLICENSE")
+            self.license()
+        elif op == 5:
+            print("\nRENEW LICENSE")
+            self.renew()
+        elif op == 6:
+            print("\nEXIT")
+            print("Closing session...")
+            if self.closeSession():
+                print("Session has been closed! Bye ;)")
+                exit()
+            else:
+                print("An error occured... Try again!")
+        else:
+            print("Invalid option!")
+
+    def auth(self, registration = False):
+        """
+        This method handles the client authentication (or registration) at server
+        """
+        url = f'{self.SERVER_URL}/api/auth' if not registration else f'{self.SERVER_URL}/api/newuser'
+        while True:
+            username = input("Username (ENTER to exit): ")
+            password = input("Password (ENTER to exit): ")
+            if not username or not password: break
+            # Create digest for password
+            if not registration:
+                passwordDigest = CryptoFunctions.create_digest(password.encode('latin'), self.DIGEST).decode('latin')
+            else:
+                passwordDigest = password
+            print("Password digest: ", passwordDigest)
+            # Create payload
+            data, MIC  = self.cipher({"username": username, "password": passwordDigest})
+            # POST to server
+            req = requests.post(url, data = data, headers = {'mic': MIC, 'sessionid': self.sessionid.bytes})
+            # Process server response
+            reqResp = self.processResponse(request = req)
+            if req.status_code != 200:
+                self.responseError(req, reqResp)
+            elif not registration:
+                self.logged = True
+                print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
+                self.showLicense(reqResp)
+                break
+            else:
+                print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
+                self.showLicense(reqResp)
+                break
+
+    def play(self):
         """
         This method is used to play the media content from the server
         """
@@ -90,17 +215,17 @@ class MediaClient:
             return
 
         # 2. Get a list of media files
-        print("Contacting Server")
-        req = requests.get(f'{SERVER_URL}/api/list')
-        if req.status_code == 200:
-            print("Got Server List")
-        
-        print(req.headers)
-        message = self.decipher(req)
-        if not message:
+        print("Contacting Server...")
+        req = requests.get(f'{SERVER_URL}/api/list', headers = {'sessionid': self.sessionid.bytes})
+        reqResp = self.processResponse(req)
+        if req.status_code != 200:
+            self.responseError(req, reqResp)
             return
-        media_list = json.loads(message.decode())
-        print(media_list)
+        
+        media_list = reqResp
+        if not media_list:
+            return
+        print("Got media list", media_list)
         
         # 3. Present a simple selection menu    
         idx = 0
@@ -112,7 +237,7 @@ class MediaClient:
         while True:
             selection = input("Select a media file number (q to quit): ")
             if selection.strip() == 'q':
-                sys.exit(0)
+                return
 
             if not selection.isdigit():
                 continue
@@ -138,51 +263,212 @@ class MediaClient:
 
             # Make request until gets a valid answer (max 5 times)
             for i in range(0,5):
-                req = requests.get(f'{SERVER_URL}/api/download?id={media_item["id"]}&chunk={chunk}')
-                
-                message = self.decipher(req, bytes(chunk))
-                if not message:
+                req = requests.get(f'{SERVER_URL}/api/download?id={media_item["id"]}&chunk={chunk}', headers = {'sessionid': self.sessionid.bytes})
+                media = self.processResponse(req, bytes(chunk))
+
+                if req.status_code != 200:
+                    self.responseError(req, media)
                     continue
 
-                chunk = json.loads(message.decode())
-                break
+                if media:
+                    break
 
             # TODO: Process chunk
 
-            data = binascii.a2b_base64(chunk['data'].encode('latin'))
+            if not media:
+                print("\nGot empty chunk!!")
+                continue
+
+            data = binascii.a2b_base64(media['data'].encode('latin'))
             try:
                 proc.stdin.write(data)
             except:
                 break
 
-    def decipher(self, request, append=None):
+    def logout(self):
         """
-        Validates the MIC sent on the header 
-        Deciphers the criptogram on the request content
-        --- Parameters
-        append      Bytes to append to shared_key before decyphering
+        This method handles the client log out at server
         """
-
-        print("\nDeciphering request...\n", request.content.strip())
-        print("\nGot MIC...\n", request.headers['Mic'].encode('latin'))
-
-        MIC = CryptoFunctions.create_digest(request.content.strip(), self.DIGEST)
-        print("\nMIC computed...\n", MIC)
-        
-        if MIC != request.headers['Mic'].encode('latin'):
-            print("INVALID MIC!")
-            return None
+        data, MIC  = self.cipher({"logout": True})
+        # POST to server
+        req = requests.post(f'{self.SERVER_URL}/api/auth', data = data, headers = {'mic': MIC, 'sessionid': self.sessionid.bytes})
+        # Process server response
+        reqResp = self.processResponse(request = req)
+        if req.status_code != 200:
+            self.responseError(req, reqResp)
         else:
-            print("Validated MIC!")
+            self.logged = False
+            print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
 
-        return CryptoFunctions.symetric_encryption( 
-            key = self.shared_key if not append else self.shared_key + append, 
-            message = request.content, 
-            algorithm_name = self.CIPHER, 
-            cypher_mode = self.CIPHERMODE, 
-            digest_mode = self.DIGEST, 
-            encode = False 
-        ) 
+    def license(self):
+        """
+        This method allows the client to look up his license status
+        """
+        req = requests.get(f'{SERVER_URL}/api/license', headers = {'sessionid': self.sessionid.bytes})
+        reqResp = self.processResponse(req)
+        if req.status_code != 200:
+            self.responseError(req, reqResp)
+            return
+
+        self.showLicense(reqResp)
+
+
+    def renew(self):
+        """
+        This method allows the client to renew his certificate with the server
+        """
+        data, MIC  = self.cipher({"renew": True})
+        # POST to server
+        req = requests.post(f'{self.SERVER_URL}/api/renew', data = data, headers = {'mic': MIC, 'sessionid': self.sessionid.bytes})
+        # Process server response
+        reqResp = self.processResponse(request = req)
+        if req.status_code != 200:
+            self.responseError(req, reqResp)
+        else:
+            print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
+            self.showLicense(reqResp)
+
+
+    def closeSession(self):
+        """
+        This method is resposible for closing session with server
+        --- Returns
+        success         Boolean
+        """
+        data, MIC  = self.cipher({"close": True})
+        # POST to server
+        req = requests.post(f'{self.SERVER_URL}/api/sessionend', data = data, headers = {'mic': MIC, 'sessionid': self.sessionid.bytes})
+        # Process server response
+        reqResp = self.processResponse(request = req)
+        if req.status_code != 200:
+            self.responseError(req, reqResp)
+            return False
+        
+        print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
+        return True
+
+    # Auxiliar functions
+    def showLicense(self, payload):
+        """
+        This function shows the license information, given a dictionary
+        It must have the attrs 'views' and 'time'
+        """
+        # Validate that required attrs are given
+        if not payload or not all(attr in payload for attr in ['views', 'time']):
+            return
+
+        t = datetime.utcfromtimestamp(payload['time'])
+        print("\n---- LICENSE ----")
+        print(f"Views: {payload['views']-1}")
+        print(f"Until: {t}")
+        if t < datetime.now() or payload['views']-1 <= 0:
+            print("EXPIRED!")
+        print("-----------------\n")
+
+
+    # Secrecy
+
+    # Cipher
+    def cipher(self, jsonobj):
+        """
+        This method ciphers a request payload
+        It also generates a MIC for the cryptogram
+        --- Parameters
+        jsonobj         A JSON parsable python object to encode
+        --- Returns
+        cryptogram      
+        MIC 
+        """
+        message = json.dumps(jsonobj).encode()
+        print("JSON to STR", message)
+
+        cryptogram = CryptoFunctions.symetric_encryption(
+            key = self.shared_key,
+            message = message,
+            algorithm_name = self.CIPHER,
+            cypher_mode = self.CIPHERMODE,
+            digest_mode = self.DIGEST,
+            encode = True
+        )
+
+        MIC = CryptoFunctions.create_digest(cryptogram, self.DIGEST).strip()
+        print("Generated MIC:\n",MIC)
+
+        return cryptogram, MIC
+    
+    # Response
+    def processResponse(self, request, append=None, ciphered=True):
+        """
+        Processes a request response
+        Validates the MIC sent on the header 
+        --- Parameters
+        request     
+        append      Bytes to append to shared_key before decyphering
+        ciphered    If response must be ciphered!
+        --- Returns
+        payload     The payload (Python obj) of the request deciphered (if the case) and validated (the MIC)
+        """
+        if not request.content: return None
+        print("\n# Deciphering request...\n", request.content.strip())
+        print("\nHeaders:\n", request.headers)
+        # Check if response is ciphered
+        if 'ciphered' not in request.headers.keys() or request.headers['ciphered'] == 'False':
+            print("\nIt is not ciphered!")
+            if ciphered:
+                print("\nERROR! Response is not ciphered, but should be!")
+                return None
+        elif not ciphered:
+            print("\nExpecting not ciphered response, but it is ciphered!")
+            return None
+        # Validate MIC
+        if ciphered:
+            print("\nGot MIC...\n", request.headers['Mic'].encode('latin'))
+            MIC = CryptoFunctions.create_digest(request.content.strip(), self.DIGEST)
+            print("\nMIC computed...\n", MIC)
+            if MIC != request.headers['Mic'].encode('latin'):
+                print("INVALID MIC!")
+                return None
+            else:
+                print("Validated MIC!")
+        else:
+            print("\nIgnoring MIC for now...")
+            # print("\nGot MIC (hash)...\n", request.headers['Mic'])
+            # MIC = str(request.content.strip()).__hash__()
+        # Check if response is ciphered
+        if not ciphered:
+            print("\nResponse is not ciphered!")
+            message = request.content
+        else:
+            message = CryptoFunctions.symetric_encryption( 
+                key = self.shared_key if not append else self.shared_key + append, 
+                message = request.content, 
+                algorithm_name = self.CIPHER, 
+                cypher_mode = self.CIPHERMODE, 
+                digest_mode = self.DIGEST, 
+                encode = False 
+            ) 
+        # Convert message bytes to str and to Python Object
+        return json.loads(message.decode()) 
+
+    def responseError(self, request, data):
+        """
+        This method shows the error details of an error response
+        --- Parameters
+        request
+        data        The response payload
+        """
+        if not data:
+            message = "Got an empty response!"
+        elif 'error' in data:
+            message = data['error']
+        else:
+            message = f"Invalid response: {str(data)}"
+        print(f"\nERROR! Received response with code {request.status_code}: {message}")
+        
+
+        
+
+
     
 c = MediaClient(SERVER_URL)
 c.start()
