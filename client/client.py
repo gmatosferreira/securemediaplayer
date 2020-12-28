@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import time
+from datetime import datetime
 
 import sys
 from aux_functions import *
@@ -188,9 +189,11 @@ class MediaClient:
             elif not registration:
                 self.logged = True
                 print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
+                self.showLicense(reqResp)
                 break
             else:
                 print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
+                self.showLicense(reqResp)
                 break
 
     def play(self):
@@ -306,6 +309,24 @@ class MediaClient:
         
         print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
         return True
+
+    # Auxiliar functions
+    def showLicense(self, payload):
+        """
+        This function shows the license information, given a dictionary
+        It must have the attrs 'views' and 'time'
+        """
+        # Validate that required attrs are given
+        if not all(attr in payload and payload[attr] for attr in ['views', 'time']):
+            return
+
+        t = datetime.utcfromtimestamp(payload['time'])
+        print("\n---- LICENSE ----")
+        print(f"Views: {payload['views']}")
+        print(f"Until: {t}")
+        if t < datetime.now() or payload['views'] <= 0:
+            print("EXPIRED!")
+        print("-----------------\n")
 
 
     # Secrecy

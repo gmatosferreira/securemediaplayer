@@ -5,6 +5,11 @@ import sys
 sys.path.append('..')
 from crypto_functions import CryptoFunctions
 
+import datetime
+
+LICENSE_VIEWS = 3
+LICENSE_SPAN = datetime.timedelta(minutes=5)
+
 def register(username, password):
     """
     This function handles the registration of a new user at server
@@ -31,8 +36,8 @@ def register(username, password):
     user = {
         'username': username,
         'passwords': {},
-        'views': 5,
-        'time': 0 
+        'views': LICENSE_VIEWS,
+        'time': (datetime.datetime.now() + LICENSE_SPAN).timestamp()
     }
 
     # Create digests for password
@@ -48,6 +53,23 @@ def register(username, password):
     json.dump(users, open('../licenses.json', 'w'))
 
     return user
+
+def licenseValid(license):
+    """
+    Given a license, this method tells if it is valid
+    """    
+    # Validate attributes
+    if not all(attr in license and license[attr] for attr in ['views', 'time']):
+        return False
+    # Check that license has not expired yet
+    t = datetime.datetime.utcfromtimestamp(license['time'])
+    if t < datetime.datetime.now():
+        return False
+    # Check that number of views is greater that zero
+    if license['views'] <= 0:
+        return False
+    # If passed validations, license is valid!
+    return True
     
 
 def authenticate(username, password, sessionData):

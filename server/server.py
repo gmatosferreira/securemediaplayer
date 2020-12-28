@@ -95,6 +95,15 @@ class MediaServer(resource.Resource):
         invalid, session = self.invalidSession(request)
         if invalid: return invalid
 
+        # Validate license
+        if not licenseValid(session['data']):
+            return self.cipherResponse(
+                request = request,
+                response = {'error': 'License is not valid! Please renew it.'},
+                sessioninfo = session,
+                error = True
+            )
+
         # Build list
         media_list = []
         for media_id in CATALOG:
@@ -121,6 +130,15 @@ class MediaServer(resource.Resource):
         # Validate session and log in
         invalid, session = self.invalidSession(request)
         if invalid: return invalid
+
+        # Validate license
+        if not licenseValid(session['data']):
+            return self.cipherResponse(
+                request = request,
+                response = {'error': 'License is not valid! Please renew it.'},
+                sessioninfo = session,
+                error = True
+            )
 
         logger.debug(f'Download: args: {request.args}')
         
@@ -306,7 +324,8 @@ class MediaServer(resource.Resource):
             'cipher': CIPHER,
             'digest': DIGEST,
             'mode': CIPHER_MODE,
-            'authenticated': False
+            'authenticated': False,
+            'data': None 
         }
 
         # 7. Return public key to client
@@ -486,8 +505,6 @@ class MediaServer(resource.Resource):
                 return self.do_session_end(request)
             elif request.path == b'/api/newLicense':
                 return self.new_license(request)
-
-          
         
         except Exception as e:
             logger.exception(e)
