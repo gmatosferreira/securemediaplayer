@@ -133,6 +133,7 @@ class MediaClient:
         else:
             print("| 1. Log out                           |")
         print("| 3. Play media                        |")
+        print("| 4. Exit                              |")
         print("|--------------------------------------|\n")
 
         op = int(input("What is your option? "))
@@ -150,6 +151,14 @@ class MediaClient:
         elif op == 3:
             print("\nPLAY")
             self.play()
+        elif op == 4:
+            print("\nEXIT")
+            print("Closing session...")
+            if self.closeSession():
+                print("Session has been closed! Bye ;)")
+                exit()
+            else:
+                print("An error occured... Try again!")
         else:
             print("Invalid option!")
 
@@ -279,6 +288,25 @@ class MediaClient:
         else:
             self.logged = False
             print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
+
+    def closeSession(self):
+        """
+        This method is resposible for closing session with server
+        --- Returns
+        success         Boolean
+        """
+        data, MIC  = self.cipher({"close": True})
+        # POST to server
+        req = requests.post(f'{self.SERVER_URL}/api/sessionend', data = data, headers = {'mic': MIC, 'sessionid': self.sessionid.bytes})
+        # Process server response
+        reqResp = self.processResponse(request = req)
+        if req.status_code != 200:
+            self.responseError(req, reqResp)
+            return False
+        
+        print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
+        return True
+
 
     # Secrecy
 

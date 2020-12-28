@@ -242,7 +242,7 @@ class MediaServer(resource.Resource):
         
     """
     This method allows the client to start a new session at the server 
-    ---
+    --- Start
     The client sends his public key
     The server generates a key pair for that client and a shared key based on those
     It also generates a session id for client
@@ -317,7 +317,7 @@ class MediaServer(resource.Resource):
 
     
     """
-    This method handles the client authentication
+    This method handles the client authentication (log in and log out)
     To authenticate, the client must have started a session!
     """
     def do_auth(self, request, registration = False):
@@ -402,6 +402,50 @@ class MediaServer(resource.Resource):
             sessioninfo = session,
             error = True
         )
+
+    def do_session_end(self, request):
+        """
+        This method allows client to end his session
+        """
+        print("\n\nEND SESSION")
+        # Process request 
+        # (Get session and decipher payload)
+        session, data = self.processRequest(request)
+        
+        print("Session:", session)
+        print("Open sessions are:", self.sessions.keys())
+
+        # Validate that client has open session
+        if not session:
+            return self.rawResponse(
+                request = request,
+                response = {'error': 'Client does not have a valid session!'},
+                error = True
+            )
+
+        # If so, delete it
+        for id, s in self.sessions.items():
+            if s == session:
+                self.sessions.pop(id)
+                print("Poped session!")
+                print("Open sessions are:", self.sessions.keys())
+                return self.cipherResponse(
+                    request = request, 
+                    response = {
+                        'success': 'The session was ended successfully!',
+                    }, 
+                    sessioninfo = session,
+                )
+
+        return self.cipherResponse(
+            request = request, 
+            response = {
+                'success': 'An error occured! Try again!',
+            }, 
+            sessioninfo = session,
+            error = True
+        )
+
                 
 
     #login and create new license
@@ -438,6 +482,8 @@ class MediaServer(resource.Resource):
                 return self.do_auth(request, registration=True)
             elif request.path == b'/api/auth':
                 return self.do_auth(request)
+            elif request.path == b'/api/sessionend':
+                return self.do_session_end(request)
             elif request.path == b'/api/newLicense':
                 return self.new_license(request)
 
