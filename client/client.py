@@ -103,7 +103,7 @@ class MediaClient:
         print("\nSerialized public key to send server!\n", pk)
         data = cipherSuite
         data['public_key'] = pk.decode('utf-8') 
-        req = requests.post(f'{self.SERVER_URL}/api/register', data=data)
+        req = requests.post(f'{self.SERVER_URL}/api/session', data=data)
         reqdata = self.processResponse(
             request = req,
             ciphered = False

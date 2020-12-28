@@ -241,12 +241,14 @@ class MediaServer(resource.Resource):
             return b''
         
     """
-    This method allows the client to register at the server (send his public key)
+    This method allows the client to start a new session at the server 
+    ---
+    The client sends his public key
     The server generates a key pair for that client and a shared key based on those
     It also generates a session id for client
     Answers to client the server public key and the session id
     """
-    def do_register(self, request):
+    def do_session(self, request):
         data = request.args
         if data == None or data == '':
             print('Data is none or empty')
@@ -430,8 +432,8 @@ class MediaServer(resource.Resource):
         try:
             if request.path == b'/api/suite':
                 return self.process_negotiation(request)
-            elif request.path == b'/api/register':
-                return self.do_register(request)
+            elif request.path == b'/api/session':
+                return self.do_session(request)
             elif request.path == b'/api/newuser':
                 return self.do_auth(request, registration=True)
             elif request.path == b'/api/auth':
