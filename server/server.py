@@ -185,6 +185,19 @@ class MediaServer(resource.Resource):
         except:
             logger.warn("Chunk format is invalid")
 
+        # Update license for first chunk (decrement views)
+        if chunk_id==0:
+            user = updateLicense(session['data']['username'], view=True)
+            if user: 
+                session['data'] = user
+            else:
+                return self.cipherResponse(
+                    request = request,
+                    response = {'error': 'There was an error updating the license. Try again!'},
+                    sessioninfo = session,
+                    error = True
+                )
+
         if not valid_chunk:
             return self.cipherResponse(
                 request = request, 
@@ -506,7 +519,7 @@ class MediaServer(resource.Resource):
 
 
         # Renew it
-        user = renewLicense(session['data']['username'])
+        user = updateLicense(session['data']['username'], renew=True)
 
         # Update session
         session['data'] = user

@@ -237,7 +237,7 @@ class MediaClient:
         while True:
             selection = input("Select a media file number (q to quit): ")
             if selection.strip() == 'q':
-                sys.exit(0)
+                return
 
             if not selection.isdigit():
                 continue
@@ -354,7 +354,7 @@ class MediaClient:
         It must have the attrs 'views' and 'time'
         """
         # Validate that required attrs are given
-        if not payload or not all(attr in payload and payload[attr] for attr in ['views', 'time']):
+        if not payload or not all(attr in payload for attr in ['views', 'time']):
             return
 
         t = datetime.utcfromtimestamp(payload['time'])
