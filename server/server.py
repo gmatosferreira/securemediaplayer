@@ -337,6 +337,18 @@ class MediaServer(resource.Resource):
                 error = True
             )
 
+        # If logout, log user out, 
+        if 'logout' in data and data['logout']:
+            print("\nLOG OUT")
+            session['authenticated'] = False
+            return self.cipherResponse(
+                request = request, 
+                response = {
+                    'success': 'The user has been sucessfully logged out!'
+                }, 
+                sessioninfo = session,
+            )
+
         # Validate that payload has data
         if not data or not all(attr in data and data[attr] for attr in ['username', 'password']):
             return self.cipherResponse(

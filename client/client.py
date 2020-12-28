@@ -143,7 +143,7 @@ class MediaClient:
                 self.auth()
             else:
                 print("\nLOG OUT")
-                print("This function is not implemented yet! :(")
+                self.logout()
         elif op == 2:
             print("\nREGISTER")
             self.auth(registration=True)
@@ -178,10 +178,10 @@ class MediaClient:
                 self.responseError(req, reqResp)
             elif not registration:
                 self.logged = True
-                print("\nAUTHENTICATION SUCCESSFUL!")
+                print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
                 break
             else:
-                print("\nREGISTRATION SUCCESSFUL!")
+                print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
                 break
 
     def play(self):
@@ -264,6 +264,21 @@ class MediaClient:
                 proc.stdin.write(data)
             except:
                 break
+
+    def logout(self):
+        """
+        This method handles the client log out at server
+        """
+        data, MIC  = self.cipher({"logout": True})
+        # POST to server
+        req = requests.post(f'{self.SERVER_URL}/api/auth', data = data, headers = {'mic': MIC, 'sessionid': self.sessionid.bytes})
+        # Process server response
+        reqResp = self.processResponse(request = req)
+        if req.status_code != 200:
+            self.responseError(req, reqResp)
+        else:
+            self.logged = False
+            print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
 
     # Secrecy
 
