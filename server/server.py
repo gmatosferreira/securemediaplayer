@@ -465,29 +465,51 @@ class MediaServer(resource.Resource):
             error = True
         )
 
-                
+    def do_renew_license(self, request):
+        """
+        This method allows the client to renew his certificate with the server
+        """
+        # Validate session and log in
+        invalid, session = self.invalidSession(request)
+        if invalid: return invalid
 
-    #login and create new license
-    
-    def new_license(self, request):
-        data = request.args
-        username, password = ""
-        if data == None or data == '':
-            print('Data is none or empty')
-        else:
-            self.username  = request.args[b'username'][0].decode('utf-8')
-            password = request.args[b'passowrd'][0].decode('utf-8')
-        add_new_license( self.username,password)
-   
-    """
-    #logout and update license
-    def update_license(self, request):
-        data = request.args
-        if data == None or data == '':
-            print('Data is none or empty')
-        else:
-            self.USERNAME = request.args[b'username'][0].decode('utf-8')
-    """    
+        # Get payload
+        session, data = self.processRequest(request)
+        if not data or 'renew' not in data or not data['renew']:
+            return self.cipherResponse(
+                request = request,
+                response = {
+                    'error': 'Invalid payload! Try again!'
+                },
+                sessioninfo = session,
+                error=True,
+            ) 
+
+
+        # Renew it
+        user = renewLicense(session['data']['username'])
+
+        if not user:
+            return self.cipherResponse(
+                request = request,
+                response = {
+                    'error': 'An error occured! Try again!'
+                },
+                sessioninfo = session,
+                error=True,
+            )  
+            
+        return self.cipherResponse(
+            request = request,
+            response = {
+                'success': 'The license was successfully renewed!',
+                'views': user['views'],
+                'time': user['time'],
+            },
+            sessioninfo = session,
+        )
+
+
 
     # Handle a POST request
     def render_POST(self, request):
@@ -503,8 +525,8 @@ class MediaServer(resource.Resource):
                 return self.do_auth(request)
             elif request.path == b'/api/sessionend':
                 return self.do_session_end(request)
-            elif request.path == b'/api/newLicense':
-                return self.new_license(request)
+            elif request.path == b'/api/renew':
+                return self.do_renew_license(request)
         
         except Exception as e:
             logger.exception(e)
@@ -658,7 +680,7 @@ class MediaServer(resource.Resource):
         elif not session['authenticated']:
             return self.cipherResponse(
                 request = request,
-                response = {'error': 'Client must be logged in to consume media!'},
+                response = {'error': 'Client must be logged in to access this resource!'},
                 sessioninfo = session,
                 error = True
             ), None

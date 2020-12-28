@@ -71,6 +71,38 @@ def licenseValid(license):
     # If passed validations, license is valid!
     return True
     
+def renewLicense(username):
+    """
+    This method renews a user license
+    --- Returns 
+    userData        The object with user info at licenses.json
+    """
+    print("\nRENEW LICENSE")
+    if not username: return None
+
+    # Load users
+    users = json.load(open('../licenses.json', 'r'))
+
+    # Find user on file
+    user = None
+    userindex = 0
+    for u in users:
+        if u['username'] == username:
+            user = u
+            break
+        userindex += 1
+
+    if not user: return None
+
+    # Renew license
+    user['views'] = LICENSE_VIEWS
+    user['time'] = (datetime.datetime.now() + LICENSE_SPAN).timestamp()
+
+    # Update users list (and file)
+    users[userindex] = user
+    json.dump(users, open('../licenses.json', 'w'))
+
+    return user
 
 def authenticate(username, password, sessionData):
     """

@@ -134,7 +134,8 @@ class MediaClient:
         else:
             print("| 1. Log out                           |")
         print("| 3. Play media                        |")
-        print("| 4. Exit                              |")
+        print("| 4. Renew license                     |")
+        print("| 5. Exit                              |")
         print("|--------------------------------------|\n")
 
         op = int(input("What is your option? "))
@@ -153,6 +154,9 @@ class MediaClient:
             print("\nPLAY")
             self.play()
         elif op == 4:
+            print("\nRENEW LICENSE")
+            self.renew()
+        elif op == 5:
             print("\nEXIT")
             print("Closing session...")
             if self.closeSession():
@@ -291,6 +295,21 @@ class MediaClient:
         else:
             self.logged = False
             print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
+
+    def renew(self):
+        """
+        This method allows the client to renew his certificate with the server
+        """
+        data, MIC  = self.cipher({"renew": True})
+        # POST to server
+        req = requests.post(f'{self.SERVER_URL}/api/renew', data = data, headers = {'mic': MIC, 'sessionid': self.sessionid.bytes})
+        # Process server response
+        reqResp = self.processResponse(request = req)
+        if req.status_code != 200:
+            self.responseError(req, reqResp)
+        else:
+            print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
+
 
     def closeSession(self):
         """
