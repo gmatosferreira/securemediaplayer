@@ -20,6 +20,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 import sys
 sys.path.append('..')
 from crypto_functions import CryptoFunctions
+from pki import PKI
 
 logger = logging.getLogger('root')
 FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
@@ -84,6 +85,9 @@ class MediaServer(resource.Resource):
 
         # Initialize session dictionary
         self.sessions = {}
+
+        # Initialize pki
+        self.pki = PKI()
 
         print("\nServer has been started!")
 

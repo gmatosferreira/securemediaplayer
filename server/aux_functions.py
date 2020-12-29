@@ -7,7 +7,6 @@ from cryptography.hazmat.primitives import serialization
 import sys
 sys.path.append('..')
 from crypto_functions import CryptoFunctions
-from pki import PKI 
 from cc import CitizenCard
 
 LICENSE_VIEWS = 4
@@ -47,8 +46,7 @@ def register(server, username, password, signature, signcert, intermedium):
 
     # Validate certificate
     print("\nVALIDATING SIGNATURE CERTIFICATE...")
-    pki = PKI(signcert, intermedium)
-    if not pki.validateCerts():
+    if not server.pki.validateCerts(signcert, intermedium):
         print("ERROR! The signature certificate is not valid!")
         return None, "The signature certificate is not valid!"
     else:

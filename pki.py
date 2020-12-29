@@ -12,34 +12,14 @@ class PKI:
         '/etc/ssl/certs': True,
     }
 
-    def __init__(self, certificate, intermedium, pem = False):
+    def __init__(self):
         """
-        This class must be initialized with a cert to validate and a list of intermedium ones
-        --- Parameters
-        certificate         String
-        intermedium         String[]
+        This class allows for the certification chain validation
         """
         print("\nPKI")
 
-        # Load certificate
-        if pem:
-            self.cert = x509.load_pem_x509_certificate(certificate.encode('latin'))
-        else:
-            self.cert = x509.load_der_x509_certificate(certificate.encode('latin'))
-        print("\nGot cert\n", self.cert)
-
-        # Load intermedium certs
-        self.intermedium = {}
-        for c in intermedium:
-            if pem:
-                pkic = x509.load_pem_x509_certificate(c.encode('latin'))
-            else:
-                pkic = x509.load_der_x509_certificate(c.encode('latin'))
-            self.intermedium[pkic.subject] = pkic
-        print("\nGot intermedium certs list...\n", self.intermedium)
-
-        # Get all system certs
-        self.systemcerts = {}
+        # Get all trustable certs
+        self.trustedcerts = {}
         for folder, pem in PKI.TRUSTEDCERTS.items():
             for file in os.scandir(folder):
                 # Validate if it is a certificate
@@ -47,13 +27,34 @@ class PKI:
                     continue
                 # Get certificate at file
                 cert = PKI.getCert(file.path, pem)
-                self.systemcerts[cert.subject] = cert
+                self.trustedcerts[cert.subject] = cert
 
-    def validateCerts(self):
+    def validateCerts(self, certificate, intermedium, pem = False):
         """
-        This method validates the certificate
+        This method validates the a certification chain for a given certificate
+        --- Parameters
+        certificate         String
+        intermedium         String[]
+        pem                 Tells if certs are PEM or DER
         """
-        return PKI.validateCertHierarchy(self.cert, self.intermedium, self.systemcerts)
+        # Load certificate
+        if pem:
+            cert = x509.load_pem_x509_certificate(certificate.encode('latin'))
+        else:
+            cert = x509.load_der_x509_certificate(certificate.encode('latin'))
+        print("\nGot cert\n", cert)
+
+        # Load intermedium certs
+        intermedium = {}
+        for c in intermedium:
+            if pem:
+                pkic = x509.load_pem_x509_certificate(c.encode('latin'))
+            else:
+                pkic = x509.load_der_x509_certificate(c.encode('latin'))
+            intermedium[pkic.subject] = pkic
+        print("\nGot intermedium certs list...\n", intermedium)
+
+        return PKI.validateCertHierarchy(cert, intermedium, self.trustedcerts)
 
     @staticmethod
     def getCert(fileLocation, pem=True):

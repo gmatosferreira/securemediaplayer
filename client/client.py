@@ -42,6 +42,9 @@ class MediaClient:
         self.SERVER_URL = SERVER_URL
         print("Initializing client...")
 
+        # Initialize pki
+        self.pki = PKI()
+
         # 1. Get DH parameters from server 
         req = requests.get(f'{self.SERVER_URL}/api/parameters')
         data = self.processResponse(
@@ -67,7 +70,7 @@ class MediaClient:
             encoding = serialization.Encoding.PEM,
             format = serialization.PublicFormat.SubjectPublicKeyInfo
         ))
-
+        
         # Initialize other vars
         self.sessionid = None
         self.shared_key = None
@@ -75,6 +78,7 @@ class MediaClient:
         self.DIGEST = None
         self.CIPHERMODE = None
         self.logged = False
+
     
     def start(self):
         """
@@ -458,8 +462,8 @@ class MediaClient:
             # MIC = str(request.content.strip()).__hash__()
         # Validate certificate and signature
         cert = request.headers['Certificate'].replace(" ", "\n").replace("\n", " ", 1)[::-1].replace("\n", " ", 1)[::-1]+"\n"
-        pki = PKI(cert, [], pem=True)
-        if not pki.validateCerts():
+        print("\nGot cert\n", cert)
+        if not self.pki.validateCerts(cert, [], pem=True):
             print("ERROR! The server certificate is not valid!")
             return None
         else:
