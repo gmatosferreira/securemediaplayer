@@ -76,7 +76,10 @@ class PKI:
         """
         This method allows to load a certificate from a file
         """
-        data = certString.encode('latin')
+        if type(certString) != bytes:
+            data = certString.encode('latin')
+        else:
+            data = certString
         if pem:
             cert = x509.load_pem_x509_certificate(data)
         else:

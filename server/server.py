@@ -79,7 +79,7 @@ class MediaServer(resource.Resource):
 
         # Load certificate
         fc = open(FILECERTIFICATE, "rb")
-        self.cert = x509.load_pem_x509_certificate(fc.read())
+        self.cert = PKI.getCertFromString(fc.read(), pem=True)
         fc.close()
         print("\nLoaded certificate...\n", self.cert)
 
