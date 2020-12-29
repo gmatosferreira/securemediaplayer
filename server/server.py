@@ -100,7 +100,7 @@ class MediaServer(resource.Resource):
         if invalid: return invalid
 
         # Validate license
-        if not licenseValid(session['username']):
+        if not licenseValid(self, session['username']):
             return self.cipherResponse(
                 request = request,
                 response = {'error': 'License is not valid! Please renew it.'},
@@ -136,7 +136,7 @@ class MediaServer(resource.Resource):
         if invalid: return invalid
 
         # Validate license
-        if not licenseValid(session['username']):
+        if not licenseValid(self, session['username']):
             return self.cipherResponse(
                 request = request,
                 response = {'error': 'License is not valid! Please renew it.'},

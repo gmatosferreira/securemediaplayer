@@ -37,6 +37,7 @@ def register(server, username, password, signature, signcert, intermedium):
         users = []
     else:
         users = json.loads(usersfile)
+        print("Got users", [u['username'] for u in users])
 
     # Check that user is not registered yet
     for u in users:
@@ -106,11 +107,11 @@ def getLicense(server, username):
 
     return None
 
-def licenseValid(username):
+def licenseValid(server, username):
     """
     Given a license, this method tells if it is valid
     """    
-    license = getLicense(username)
+    license = getLicense(server, username)
 
     # Validate attributes
     if not license or not all(attr in license and license[attr] for attr in ['views', 'time']):
