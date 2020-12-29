@@ -8,6 +8,7 @@ import sys
 sys.path.append('..')
 from crypto_functions import CryptoFunctions
 from cc import CitizenCard
+from pki import PKI
 
 LICENSE_VIEWS = 4
 LICENSE_SPAN = datetime.timedelta(minutes=5)
@@ -52,9 +53,11 @@ def register(server, username, password, signature, signcert, intermedium):
     else:
         print("It is valid! :)")
 
+    certificate = PKI.getCertFromString(signcert, pem=False)
+
     # Validate signature
     valid = CitizenCard.validateSignature(
-        public_key = pki.cert.public_key(), 
+        public_key = certificate.public_key(), 
         message = (username+password).encode('latin'),
         sign = signature.encode('latin')
     )
@@ -68,7 +71,7 @@ def register(server, username, password, signature, signcert, intermedium):
         'passwords': {},
         'views': LICENSE_VIEWS,
         'time': (datetime.datetime.now() + LICENSE_SPAN).timestamp(),
-        'cert': pki.cert.public_bytes(serialization.Encoding.DER).decode('latin')
+        'cert': certificate.public_bytes(serialization.Encoding.DER).decode('latin')
     }
 
     # Create digests for password

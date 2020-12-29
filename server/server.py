@@ -628,11 +628,14 @@ class MediaServer(resource.Resource):
         # Generate MIC
         MIC = CryptoFunctions.create_digest(cryptogram, sessioninfo['digest'])
         print("\nGenerated MIC:\n", MIC)
+        MAC = CryptoFunctions.create_digest(cryptogram+sessioninfo['shared_key'], sessioninfo['digest'])
+        print("\nGenerated MAC:\n", MAC)
         # Sign request with private key
         SIGN = CryptoFunctions.signingRSA(cryptogram, self.private_key)
         print("\nGenerated signature:\n", SIGN)
         # Add headers
         request.responseHeaders.addRawHeader(b"mic", MIC)
+        request.responseHeaders.addRawHeader(b"mac", MAC)
         request.responseHeaders.addRawHeader(b"signature", SIGN)
         request.responseHeaders.addRawHeader(b"certificate", self.cert.public_bytes(encoding = serialization.Encoding.PEM))
         request.responseHeaders.addRawHeader(b"ciphered", b"True")
@@ -697,6 +700,7 @@ class MediaServer(resource.Resource):
         
         # Get MIC and validate it
         headers = request.getAllHeaders()
+        
         RMIC = headers[b'mic']
         print("\nGot MIC...\n", RMIC)
         MIC = CryptoFunctions.create_digest(request.content.getvalue().strip(), session['digest']).strip()
@@ -706,6 +710,16 @@ class MediaServer(resource.Resource):
             return None, None
         else:
             print("Validated MIC!")
+
+        RMAC = headers[b'mac']
+        print("\nGot MAC...\n", RMIC)
+        MAC = CryptoFunctions.create_digest(request.content.getvalue().strip() + session['shared_key'], session['digest']).strip()
+        print("\nMAC computed...\n", MAC)
+        if MAC != RMAC:
+            print("INVALID MAC!")
+            return None, None
+        else:
+            print("Validated MAC!")
 
         # Decipher request
         print("\nDeciphering request...\n", request.content.getvalue().strip())
