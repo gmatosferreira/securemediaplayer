@@ -40,8 +40,8 @@ CATALOG = { '898a08080d1840793122b7e118b27a95d117ebce':
 
 CATALOG_BASE = 'catalog'
 CHUNK_SIZE = 1024 * 4  #block
-FILEPRIVATEKEY = '../keys/server_cert_key.pk8'
-FILECERTIFICATE = '../certificates/server_cert.pem'
+FILEPRIVATEKEY = '../keys/server_localhost.pk8'
+FILECERTIFICATE = '../certificates/server_localhost.pem'
 
 # Load server key
 with open('key.txt') as f:
