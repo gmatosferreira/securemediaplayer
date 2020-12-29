@@ -1,27 +1,31 @@
 
 import json
+import datetime
+from cryptography import x509
 
 import sys
 sys.path.append('..')
 from crypto_functions import CryptoFunctions
 
-import datetime
-
 LICENSE_VIEWS = 4
 LICENSE_SPAN = datetime.timedelta(minutes=5)
 
-def register(username, password):
+def register(username, password, signature, signcert, intermedium):
     """
     This function handles the registration of a new user at server
     It gives the user a default license of 5 views
     --- Parameters
-    username        String
-    password        String (digest)
+    username        String          The user username
+    password        String          The raw password
+    signature       String          The username+password signature
+    signcert        String          Certificate used to generate signature
+    intermedium     String[]        List of intermedium certs
     --- Returns
-    userData        The object with user info at licenses.json
+    userData        dict()          The object with user info at licenses.json
+    errorMessage    String          A message describing the error
     """
     print("\nREGISTER")
-    if not username or not password: return None
+    if not username or not password: return None, "There are attributes missing!"
 
     # Load users
     users = json.load(open('../licenses.json', 'r'))
@@ -30,7 +34,8 @@ def register(username, password):
     for u in users:
         if u['username'] == username:
             print("ERROR! User already exists!")
-            return None
+            return None, "The username given is already being used! Please choose other."
+
 
     # Create user
     user = {
@@ -52,7 +57,7 @@ def register(username, password):
     # Update file
     json.dump(users, open('../licenses.json', 'w'))
 
-    return user
+    return user, ""
 
 def getLicense(username):
     """

@@ -401,7 +401,10 @@ class MediaServer(resource.Resource):
             )
 
         # Validate that payload has data
-        if not data or not all(attr in data and data[attr] for attr in ['username', 'password']):
+        invalid = not data
+        invalid = invalid or not all(attr in data and data[attr] for attr in ['username', 'password', 'signature'])
+        invalid = invalid or (registration and not all(attr in data and data[attr] for attr in ['signcert', 'intermedium']))
+        if invalid:
             return self.cipherResponse(
                 request = request, 
                 response = {'error': 'Payload is not valid!'}, 
@@ -424,7 +427,7 @@ class MediaServer(resource.Resource):
         if not registration:
             userData = authenticate(data['username'], data['password'], session)
         else:
-            userData = register(data['username'], data['password'])
+            userData, error = register(data['username'], data['password'], data['signature'], data['signcert'], data['intermedium'])
         # If authenticated/registered sucessfully
         if userData:
             if not registration:
@@ -443,7 +446,7 @@ class MediaServer(resource.Resource):
 
         return self.cipherResponse(
             request = request, 
-            response = {'error': 'The sent data is not valid!'}, 
+            response = {'error':  'The sent data is not valid!' if not error else error}, 
             sessioninfo = session,
             error = True
         )

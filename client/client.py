@@ -196,10 +196,20 @@ class MediaClient:
             else:
                 passwordDigest = password
             print("Password digest: ", passwordDigest)
+            # Sign username+password
+            signature = cc.sign(username+passwordDigest).decode('latin')
+            print("\nSigned username+password:", signature)
             # Create payload
-            data, MIC  = self.cipher({"username": username, "password": passwordDigest})
+            payload = {"username": username, "password": passwordDigest, "signature": signature}
+            # On registration, send signature certificate
+            if registration:
+                payload['signcert'] = cc.cert.public_bytes(serialization.Encoding.DER).decode('latin')
+                payload['intermedium'] = [c.public_bytes(serialization.Encoding.DER).decode('latin') for c in cc.intermedium]
+                print("\nEncoded CC public key...\n", payload['signcert'])
+            data, MIC  = self.cipher(payload)
+            headers = {'mic': MIC, 'sessionid': self.sessionid.bytes}
             # POST to server
-            req = requests.post(url, data = data, headers = {'mic': MIC, 'sessionid': self.sessionid.bytes})
+            req = requests.post(url, data = data, headers = headers)
             # Process server response
             reqResp = self.processResponse(request = req)
             if req.status_code != 200:
@@ -380,7 +390,7 @@ class MediaClient:
         --- Parameters
         jsonobj         A JSON parsable python object to encode
         --- Returns
-        cryptogram      
+        cryptogram      bytes
         MIC 
         """
         message = json.dumps(jsonobj).encode()
