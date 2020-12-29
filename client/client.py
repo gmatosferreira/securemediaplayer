@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import time
+import base64
 from datetime import datetime
 
 import sys
@@ -30,6 +31,8 @@ logging.basicConfig(format=FORMAT)
 logger.setLevel(logging.INFO)
 
 SERVER_URL = 'http://127.0.0.1:8080'
+FILEPRIVATEKEY = '../keys/client_localhost.pk8'
+FILECERTIFICATE = '../certificates/client_localhost.pem'
 
 class MediaClient:
 
@@ -44,6 +47,21 @@ class MediaClient:
 
         # Initialize pki
         self.pki = PKI()
+
+        # Load private key
+        fp = open(FILEPRIVATEKEY, 'rb')
+        self.cert_private_key = serialization.load_pem_private_key(
+            fp.read(),
+            password = 'key'.encode('utf-8')
+        )
+        fp.close()
+        print("\nLoaded certificate private key...\n", self.cert_private_key)
+
+        # Load certificate
+        fc = open(FILECERTIFICATE, "rb")
+        self.cert = PKI.getCertFromString(fc.read(), pem=True)
+        fc.close()
+        print("\nLoaded certificate...\n", self.cert)
 
         # 1. Get DH parameters from server 
         req = requests.get(f'{self.SERVER_URL}/api/parameters')
@@ -218,8 +236,8 @@ class MediaClient:
                 payload['signcert'] = cc.cert.public_bytes(serialization.Encoding.DER).decode('latin')
                 payload['intermedium'] = [c.public_bytes(serialization.Encoding.DER).decode('latin') for c in cc.intermedium]
                 print("\nEncoded CC public key...\n", payload['signcert'])
-            data, MIC, MAC  = self.cipher(payload)
-            headers = {'mic': MIC, 'mac': MAC, 'sessionid': self.sessionid.bytes}
+            data, MIC, MAC, SIGN  = self.cipher(payload)
+            headers = {'mic': MIC, 'mac': MAC, 'signature': SIGN, 'cert': self.cert.public_bytes(encoding = serialization.Encoding.PEM), 'sessionid': self.sessionid.bytes}
             # POST to server
             req = requests.post(url, data = data, headers = headers)
             # Process server response
@@ -315,9 +333,9 @@ class MediaClient:
         """
         This method handles the client log out at server
         """
-        data, MIC, MAC  = self.cipher({"logout": True})
+        data, MIC, MAC, SIGN  = self.cipher({"logout": True})
         # POST to server
-        req = requests.post(f'{self.SERVER_URL}/api/auth', data = data, headers = {'mic': MIC, 'mac': MAC, 'sessionid': self.sessionid.bytes})
+        req = requests.post(f'{self.SERVER_URL}/api/auth', data = data, headers = {'mic': MIC, 'mac': MAC, 'signature': SIGN, 'cert': self.cert.public_bytes(encoding = serialization.Encoding.PEM), 'sessionid': self.sessionid.bytes})
         # Process server response
         reqResp = self.processResponse(request = req)
         if req.status_code != 200:
@@ -343,9 +361,9 @@ class MediaClient:
         """
         This method allows the client to renew his certificate with the server
         """
-        data, MIC, MAC  = self.cipher({"renew": True})
+        data, MIC, MAC, SIGN  = self.cipher({"renew": True})
         # POST to server
-        req = requests.post(f'{self.SERVER_URL}/api/renew', data = data, headers = {'mic': MIC, 'mac': MAC, 'sessionid': self.sessionid.bytes})
+        req = requests.post(f'{self.SERVER_URL}/api/renew', data = data, headers = {'mic': MIC, 'mac': MAC, 'signature': SIGN, 'cert': self.cert.public_bytes(encoding = serialization.Encoding.PEM), 'sessionid': self.sessionid.bytes})
         # Process server response
         reqResp = self.processResponse(request = req)
         if req.status_code != 200:
@@ -361,9 +379,9 @@ class MediaClient:
         --- Returns
         success         Boolean
         """
-        data, MIC, MAC  = self.cipher({"close": True})
+        data, MIC, MAC, SIGN  = self.cipher({"close": True})
         # POST to server
-        req = requests.post(f'{self.SERVER_URL}/api/sessionend', data = data, headers = {'mic': MIC, 'mac': MAC, 'sessionid': self.sessionid.bytes})
+        req = requests.post(f'{self.SERVER_URL}/api/sessionend', data = data, headers = {'mic': MIC, 'mac': MAC, 'signature': SIGN, 'cert': self.cert.public_bytes(encoding = serialization.Encoding.PEM), 'sessionid': self.sessionid.bytes})
         # Process server response
         reqResp = self.processResponse(request = req)
         if req.status_code != 200:
@@ -405,6 +423,7 @@ class MediaClient:
         cryptogram      bytes
         MIC 
         MAC
+        SIGN            The signature with the client private key
         """
         message = json.dumps(jsonobj).encode()
         print("JSON to STR", message)
@@ -422,8 +441,9 @@ class MediaClient:
         print("Generated MIC:\n",MIC)
         MAC = CryptoFunctions.create_digest(cryptogram+self.shared_key, self.DIGEST).strip()
         print("\nGenerated MAC:\n", MAC)
+        SIGN = CryptoFunctions.signingRSA(cryptogram, self.cert_private_key)
 
-        return cryptogram, MIC, MAC
+        return cryptogram, MIC, MAC, SIGN
     
     # Response
     def processResponse(self, request, append=None, ciphered=True):

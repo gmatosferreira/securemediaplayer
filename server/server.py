@@ -578,9 +578,7 @@ class MediaServer(resource.Resource):
     def render_POST(self, request):
         logger.debug(f'\nReceived POST for {request.uri}')
         try:
-            if request.path == b'/api/suite':
-                return self.process_negotiation(request)
-            elif request.path == b'/api/session':
+            if request.path == b'/api/session':
                 return self.do_session(request)
             elif request.path == b'/api/newuser':
                 return self.do_auth(request, registration=True)
@@ -693,13 +691,19 @@ class MediaServer(resource.Resource):
         """
         print("\nProcessing request...")
 
+        headers = request.getAllHeaders()
+        # Validate certificate
+        print("\nGot Certificate and Signature...")
+        print(headers[b'signature'])
+        print(headers[b'cert'])
+
+
         # Get session and validate it
         session = self.getSession(request)
         if not session:
             return None, None
         
         # Get MIC and validate it
-        headers = request.getAllHeaders()
         
         RMIC = headers[b'mic']
         print("\nGot MIC...\n", RMIC)
