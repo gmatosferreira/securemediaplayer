@@ -6,6 +6,7 @@ from cryptography import x509
 import sys
 sys.path.append('..')
 from crypto_functions import CryptoFunctions
+from pki import PKI 
 
 LICENSE_VIEWS = 4
 LICENSE_SPAN = datetime.timedelta(minutes=5)
@@ -36,6 +37,14 @@ def register(username, password, signature, signcert, intermedium):
             print("ERROR! User already exists!")
             return None, "The username given is already being used! Please choose other."
 
+    # Validate certificate
+    print("\nVALIDATING SIGNATURE CERTIFICATE...")
+    pki = PKI(signcert, intermedium)
+    if not pki.validateCerts():
+        print("ERROR! The signature certificate is not valid!")
+        return None, "The signature certificate is not valid!"
+    else:
+        print("It is valid! :)")
 
     # Create user
     user = {
