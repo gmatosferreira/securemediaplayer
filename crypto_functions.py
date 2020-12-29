@@ -57,77 +57,6 @@ class CryptoFunctions:
         )
 
     """
-    This method asks the server for the available protocols
-    and lets the user define the protocols to use.
-    It returns the cipher suite.
-    """
-    @staticmethod
-    def client_chosen_options(server_url):
-        # Ask server for available protocols
-        req = requests.get(f'{server_url}/api/protocols')    
-        
-        if req.status_code == 200:
-            print("Got Protocols!")
-        else:
-            print("The server is not available!")
-            exit()
-    
-        protocols = req.json()
-
-        # Cipher choice
-        while True:
-            # Show options
-            print("\nChoose a cipher algorithm: ")
-            i=1
-            for cipher in protocols['cipher']:
-                print(i, ")",cipher)
-                i+=1
-            # Receive input
-            print("> " , end =" ")
-            op = int(input())
-            if op >= 1 and op <= len(protocols['cipher']):
-                cipher = protocols['cipher'][op-1]
-                break
-            print("That is not a valid option! Try again!")
-        
-        # Digest choice
-        while True:
-            # Show options
-            print("\nChoose a digest: ")
-            i=1
-            for digest in protocols['digests']:
-                print(i, ")",digest)
-                i+=1
-            # Receive input
-            print("> " , end =" ")
-            op = int(input())
-            if op >= 1 and op <= len(protocols['digests']):
-                digest = protocols['digests'][op-1]
-                break
-            print("That is not a valid option! Try again!")
-
-        # Cipher mode choice
-        while True: 
-            # Show options
-            print("\nChoose a cipher mode: ")
-            i=1
-            for mode in protocols['cipher_mode']:
-                print(i, ")",mode)
-                i+=1
-            # Receive input
-            print("> " , end =" ")
-            op = int(input())
-            if op >= 1 and op <= len(protocols['cipher_mode']):
-                cipher_mode = protocols['cipher_mode'][op-1]
-                break
-            print("That is not a valid option! Try again!")
-
-        cipherSuite = {'cipher': cipher, 'digest': digest, 'cipher_mode':cipher_mode}
-        
-        return cipherSuite
-
-
-    """
     This method checks and applys a digest function to a given message
     The default size is 256
     --- Returns
@@ -166,10 +95,6 @@ class CryptoFunctions:
         
         return mac.finalize()
 
-    #MIC é um DIGEST
-        
-        
-
     """
     This method handles symetric encryption/decription
     --- Parameters
@@ -190,7 +115,6 @@ class CryptoFunctions:
         if len(key)*8 != 256:
             key = CryptoFunctions.create_digest(key, digest_mode)
         print(f"Symetric encription with key of size {len(key)*8}...")
-        print("Message is:\n", message)
 
         # Define algorithm
         algorithm = None
@@ -242,9 +166,9 @@ class CryptoFunctions:
             criptograma += iv
 
         # Iterate over blocks
+        print(f"# Starting from 0 to {len(message)+1} with jumps of {blockLength}")
         for i in range(0,len(message)+1,blockLength):
             data = message[i:i+blockLength] if i < len(message) else b''
-            print(data, len(data))
             # If data has block size, just encrypt
             if len(data) == blockLength:
                 criptograma += cryptor.update(data)
@@ -255,6 +179,7 @@ class CryptoFunctions:
                     padding_length = blockLength - len(data)
                     padding = [padding_length] * (padding_length)
                     criptograma += cryptor.update(data + bytes(padding))
+        print()
     
         # Add finalization on both modes
         criptograma += cryptor.finalize()

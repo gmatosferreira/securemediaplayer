@@ -5,9 +5,11 @@ import json
 import os
 import subprocess
 import time
+from datetime import datetime
 
 import sys
 from aux_functions import *
+from cc import CitizenCard
 
 # Serialization
 from cryptography.hazmat.primitives import serialization
@@ -103,7 +105,7 @@ class MediaClient:
         print("\nSerialized public key to send server!\n", pk)
         data = cipherSuite
         data['public_key'] = pk.decode('utf-8') 
-        req = requests.post(f'{self.SERVER_URL}/api/register', data=data)
+        req = requests.post(f'{self.SERVER_URL}/api/session', data=data)
         reqdata = self.processResponse(
             request = req,
             ciphered = False
@@ -124,6 +126,13 @@ class MediaClient:
         print("\nGenerated the client shared key!\n", self.shared_key)
 
     def run(self):
+        # 1. Validate that client has already been started
+        required = [self.shared_key, self.CIPHER, self.DIGEST, self.CIPHERMODE]
+        if not all([a for a in required]):
+            print("ERROR! The client can't be run without having been started first!")
+            return
+        
+        # 2. Show menu
         print("|--------------------------------------|")
         print("|       SECURE MEDIA CLIENT MENU       |")
         print("|                                      |")
@@ -133,6 +142,9 @@ class MediaClient:
         else:
             print("| 1. Log out                           |")
         print("| 3. Play media                        |")
+        print("| 4. Look up license                   |")
+        print("| 5. Renew license                     |")
+        print("| 6. Exit                              |")
         print("|--------------------------------------|\n")
 
         op = int(input("What is your option? "))
@@ -143,13 +155,27 @@ class MediaClient:
                 self.auth()
             else:
                 print("\nLOG OUT")
-                print("This function is not implemented yet! :(")
+                self.logout()
         elif op == 2:
             print("\nREGISTER")
             self.auth(registration=True)
         elif op == 3:
             print("\nPLAY")
             self.play()
+        elif op == 4:
+            print("\nLICENSE")
+            self.license()
+        elif op == 5:
+            print("\nRENEW LICENSE")
+            self.renew()
+        elif op == 6:
+            print("\nEXIT")
+            print("Closing session...")
+            if self.closeSession():
+                print("Session has been closed! Bye ;)")
+                exit()
+            else:
+                print("An error occured... Try again!")
         else:
             print("Invalid option!")
 
@@ -157,6 +183,8 @@ class MediaClient:
         """
         This method handles the client authentication (or registration) at server
         """
+        cc = CitizenCard() 
+        
         url = f'{self.SERVER_URL}/api/auth' if not registration else f'{self.SERVER_URL}/api/newuser'
         while True:
             username = input("Username (ENTER to exit): ")
@@ -168,33 +196,39 @@ class MediaClient:
             else:
                 passwordDigest = password
             print("Password digest: ", passwordDigest)
+            # Sign username+password
+            signature = cc.sign((username+passwordDigest).encode('latin')).decode('latin')
+            print("\nSigned username+password:", signature)
             # Create payload
-            data, MIC  = self.cipher({"username": username, "password": passwordDigest})
+            payload = {"username": username, "password": passwordDigest, "signature": signature}
+            # On registration, send signature certificate
+            if registration:
+                payload['signcert'] = cc.cert.public_bytes(serialization.Encoding.DER).decode('latin')
+                payload['intermedium'] = [c.public_bytes(serialization.Encoding.DER).decode('latin') for c in cc.intermedium]
+                print("\nEncoded CC public key...\n", payload['signcert'])
+            data, MIC  = self.cipher(payload)
+            headers = {'mic': MIC, 'sessionid': self.sessionid.bytes}
             # POST to server
-            req = requests.post(url, data = data, headers = {'mic': MIC, 'sessionid': self.sessionid.bytes})
+            req = requests.post(url, data = data, headers = headers)
             # Process server response
             reqResp = self.processResponse(request = req)
             if req.status_code != 200:
                 self.responseError(req, reqResp)
             elif not registration:
                 self.logged = True
-                print("\nAUTHENTICATION SUCCESSFUL!")
+                print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
+                self.showLicense(reqResp)
                 break
             else:
-                print("\nREGISTRATION SUCCESSFUL!")
+                print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
+                self.showLicense(reqResp)
                 break
 
     def play(self):
         """
         This method is used to play the media content from the server
         """
-        # 1. Validate that client has already been started
-        required = [self.shared_key, self.CIPHER, self.DIGEST, self.CIPHERMODE]
-        if not all([a for a in required]):
-            print("ERROR! The client can't be run without having been started first!")
-            return
-
-        # 2. Get a list of media files
+        # 1. Get a list of media files
         print("Contacting Server...")
         req = requests.get(f'{SERVER_URL}/api/list', headers = {'sessionid': self.sessionid.bytes})
         reqResp = self.processResponse(req)
@@ -207,7 +241,7 @@ class MediaClient:
             return
         print("Got media list", media_list)
         
-        # 3. Present a simple selection menu    
+        # 2. Present a simple selection menu    
         idx = 0
         print("MEDIA CATALOG\n")
         for item in media_list:
@@ -217,7 +251,7 @@ class MediaClient:
         while True:
             selection = input("Select a media file number (q to quit): ")
             if selection.strip() == 'q':
-                sys.exit(0)
+                return
 
             if not selection.isdigit():
                 continue
@@ -255,8 +289,8 @@ class MediaClient:
 
             # TODO: Process chunk
 
-            if not media:
-                print("\nGot empty chunk!!")
+            if not media or 'error' in media:
+                print("\nGot empty or invalid chunk!!")
                 continue
 
             data = binascii.a2b_base64(media['data'].encode('latin'))
@@ -264,6 +298,87 @@ class MediaClient:
                 proc.stdin.write(data)
             except:
                 break
+
+    def logout(self):
+        """
+        This method handles the client log out at server
+        """
+        data, MIC  = self.cipher({"logout": True})
+        # POST to server
+        req = requests.post(f'{self.SERVER_URL}/api/auth', data = data, headers = {'mic': MIC, 'sessionid': self.sessionid.bytes})
+        # Process server response
+        reqResp = self.processResponse(request = req)
+        if req.status_code != 200:
+            self.responseError(req, reqResp)
+        else:
+            self.logged = False
+            print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
+
+    def license(self):
+        """
+        This method allows the client to look up his license status
+        """
+        req = requests.get(f'{SERVER_URL}/api/license', headers = {'sessionid': self.sessionid.bytes})
+        reqResp = self.processResponse(req)
+        if req.status_code != 200:
+            self.responseError(req, reqResp)
+            return
+
+        self.showLicense(reqResp)
+
+
+    def renew(self):
+        """
+        This method allows the client to renew his certificate with the server
+        """
+        data, MIC  = self.cipher({"renew": True})
+        # POST to server
+        req = requests.post(f'{self.SERVER_URL}/api/renew', data = data, headers = {'mic': MIC, 'sessionid': self.sessionid.bytes})
+        # Process server response
+        reqResp = self.processResponse(request = req)
+        if req.status_code != 200:
+            self.responseError(req, reqResp)
+        else:
+            print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
+            self.showLicense(reqResp)
+
+
+    def closeSession(self):
+        """
+        This method is resposible for closing session with server
+        --- Returns
+        success         Boolean
+        """
+        data, MIC  = self.cipher({"close": True})
+        # POST to server
+        req = requests.post(f'{self.SERVER_URL}/api/sessionend', data = data, headers = {'mic': MIC, 'sessionid': self.sessionid.bytes})
+        # Process server response
+        reqResp = self.processResponse(request = req)
+        if req.status_code != 200:
+            self.responseError(req, reqResp)
+            return False
+        
+        print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
+        return True
+
+    # Auxiliar functions
+    def showLicense(self, payload):
+        """
+        This function shows the license information, given a dictionary
+        It must have the attrs 'views' and 'time'
+        """
+        # Validate that required attrs are given
+        if not payload or not all(attr in payload for attr in ['views', 'time']):
+            return
+
+        t = datetime.utcfromtimestamp(payload['time'])
+        print("\n---- LICENSE ----")
+        print(f"Views: {payload['views']-1}")
+        print(f"Until: {t}")
+        if t < datetime.now() or payload['views']-1 <= 0:
+            print("EXPIRED!")
+        print("-----------------\n")
+
 
     # Secrecy
 
@@ -275,7 +390,7 @@ class MediaClient:
         --- Parameters
         jsonobj         A JSON parsable python object to encode
         --- Returns
-        cryptogram      
+        cryptogram      bytes
         MIC 
         """
         message = json.dumps(jsonobj).encode()
