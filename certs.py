@@ -37,11 +37,22 @@ def load_cert_key(file):
 def load_all_certs():
         #load server cert
         client_cert = load_cert("certificates/client_localhost.pem")
+        print(client_cert)
+        print(client_cert.issuer)
+        print(client_cert.subject)
         server_cert = load_cert("certificates/server_localhost.pem")
-        ca_cert = load_cert("certificates/SIO_CA.pem" )
+        print(server_cert)
+        print(server_cert.issuer)
+        print(server_cert.subject)
+        ca_cert = load_cert("certsca/SIO_CA.pem" ) 
+        print(ca_cert)
+        print(ca_cert.issuer)
+        print(ca_cert.subject)
         
         rsa_private_key = load_cert_key("keys/client_localhost.pk8")
+        print(rsa_private_key)
         rsa_privateKey = load_cert_key("keys/server_localhost.pk8")
+        print(rsa_privateKey)
 
 
 
