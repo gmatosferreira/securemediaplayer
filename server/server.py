@@ -425,7 +425,7 @@ class MediaServer(resource.Resource):
         print("\nData received is...\n", data)
         # Validate data
         if not registration:
-            userData = authenticate(data['username'], data['password'], session)
+            userData, error = authenticate(data['username'], data['password'], data['signature'], session)
         else:
             userData, error = register(data['username'], data['password'], data['signature'], data['signcert'], data['intermedium'])
         # If authenticated/registered sucessfully
@@ -681,6 +681,7 @@ class MediaServer(resource.Resource):
         This method gets the session for the token sent on request header
         """
         headers = request.getAllHeaders()
+        print("Sessionid", headers[b'sessionid'], type(headers[b'sessionid']))
         sessionid = uuid.UUID(bytes=headers[b'sessionid'])
         if sessionid not in self.sessions.keys():
             print(f"\nInvalid session! ({sessionid})")

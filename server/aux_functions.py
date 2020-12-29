@@ -64,6 +64,7 @@ def register(username, password, signature, signcert, intermedium):
         'passwords': {},
         'views': LICENSE_VIEWS,
         'time': (datetime.datetime.now() + LICENSE_SPAN).timestamp(),
+        'cert': pki.cert.public_bytes(serialization.Encoding.DER).decode('latin')
     }
 
     # Create digests for password
@@ -152,15 +153,17 @@ def updateLicense(username, renew = False, view = False):
 
     return user
 
-def authenticate(username, password, sessionData):
+def authenticate(username, password, signature, sessionData):
     """
     This function authenticates a user given its password
     --- Parameters
     username        String
     password        String (digest)
+    signature       String          The username+password signature
     sessionData     The session data
     --- Returns
     userData        The object with user info at licenses.json
+    error           The error message
     """
     print("\nAUTHENTICATE")
     # Load users
@@ -171,15 +174,27 @@ def authenticate(username, password, sessionData):
         if u['username'] == username:
             print("Found user!")
 
+            # Validate signature with user stored certificate 
+            cert = x509.load_der_x509_certificate(u['cert'].encode('latin'))
+            valid = CitizenCard.validateSignature(
+                public_key = cert.public_key(), 
+                message = (username+password).encode('latin'),
+                sign = signature.encode('latin')
+            )
+            print("\nValidating signature...", valid)
+            if not valid:
+                return None, "The signature is not valid!"
+                
+            # Check password
             print("Expected password is", u['passwords'][sessionData['digest']].encode('latin'), f"({len(u['passwords'][sessionData['digest']].encode('latin'))})")
             print("Got", password.encode('latin'), f"({len(password.encode('latin'))})")
             
             if u['passwords'][sessionData['digest']] == password:
                 print("Password is valid! :)")
-                return u
+                return u, ""
             else:
                 print("Password is not valid! :/")
-                return None
+                return None, ""
 
     # If not found, return None
     print("User not found...")

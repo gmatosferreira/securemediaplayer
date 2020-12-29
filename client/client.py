@@ -197,7 +197,7 @@ class MediaClient:
                 passwordDigest = password
             print("Password digest: ", passwordDigest)
             # Sign username+password
-            signature = cc.sign(username+passwordDigest).decode('latin')
+            signature = cc.sign((username+passwordDigest).encode('latin')).decode('latin')
             print("\nSigned username+password:", signature)
             # Create payload
             payload = {"username": username, "password": passwordDigest, "signature": signature}
