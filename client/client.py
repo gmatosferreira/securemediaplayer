@@ -218,8 +218,8 @@ class MediaClient:
                 payload['signcert'] = cc.cert.public_bytes(serialization.Encoding.DER).decode('latin')
                 payload['intermedium'] = [c.public_bytes(serialization.Encoding.DER).decode('latin') for c in cc.intermedium]
                 print("\nEncoded CC public key...\n", payload['signcert'])
-            data, MIC  = self.cipher(payload)
-            headers = {'mic': MIC, 'sessionid': self.sessionid.bytes}
+            data, MIC, MAC  = self.cipher(payload)
+            headers = {'mic': MIC, 'mac': MAC, 'sessionid': self.sessionid.bytes}
             # POST to server
             req = requests.post(url, data = data, headers = headers)
             # Process server response
@@ -315,9 +315,9 @@ class MediaClient:
         """
         This method handles the client log out at server
         """
-        data, MIC  = self.cipher({"logout": True})
+        data, MIC, MAC  = self.cipher({"logout": True})
         # POST to server
-        req = requests.post(f'{self.SERVER_URL}/api/auth', data = data, headers = {'mic': MIC, 'sessionid': self.sessionid.bytes})
+        req = requests.post(f'{self.SERVER_URL}/api/auth', data = data, headers = {'mic': MIC, 'mac': MAC, 'sessionid': self.sessionid.bytes})
         # Process server response
         reqResp = self.processResponse(request = req)
         if req.status_code != 200:
@@ -343,9 +343,9 @@ class MediaClient:
         """
         This method allows the client to renew his certificate with the server
         """
-        data, MIC  = self.cipher({"renew": True})
+        data, MIC, MAC  = self.cipher({"renew": True})
         # POST to server
-        req = requests.post(f'{self.SERVER_URL}/api/renew', data = data, headers = {'mic': MIC, 'sessionid': self.sessionid.bytes})
+        req = requests.post(f'{self.SERVER_URL}/api/renew', data = data, headers = {'mic': MIC, 'mac': MAC, 'sessionid': self.sessionid.bytes})
         # Process server response
         reqResp = self.processResponse(request = req)
         if req.status_code != 200:
@@ -361,9 +361,9 @@ class MediaClient:
         --- Returns
         success         Boolean
         """
-        data, MIC  = self.cipher({"close": True})
+        data, MIC, MAC  = self.cipher({"close": True})
         # POST to server
-        req = requests.post(f'{self.SERVER_URL}/api/sessionend', data = data, headers = {'mic': MIC, 'sessionid': self.sessionid.bytes})
+        req = requests.post(f'{self.SERVER_URL}/api/sessionend', data = data, headers = {'mic': MIC, 'mac': MAC, 'sessionid': self.sessionid.bytes})
         # Process server response
         reqResp = self.processResponse(request = req)
         if req.status_code != 200:
@@ -404,6 +404,7 @@ class MediaClient:
         --- Returns
         cryptogram      bytes
         MIC 
+        MAC
         """
         message = json.dumps(jsonobj).encode()
         print("JSON to STR", message)
@@ -419,8 +420,10 @@ class MediaClient:
 
         MIC = CryptoFunctions.create_digest(cryptogram, self.DIGEST).strip()
         print("Generated MIC:\n",MIC)
+        MAC = CryptoFunctions.create_digest(cryptogram+self.shared_key, self.DIGEST).strip()
+        print("\nGenerated MAC:\n", MAC)
 
-        return cryptogram, MIC
+        return cryptogram, MIC, MAC
     
     # Response
     def processResponse(self, request, append=None, ciphered=True):
@@ -456,13 +459,20 @@ class MediaClient:
                 return None
             else:
                 print("Validated MIC!")
+            
+            print("\nGot MAC...\n", request.headers['Mac'].encode('latin'))
+            MAC = CryptoFunctions.create_digest(request.content.strip() + self.shared_key, self.DIGEST)
+            if MAC != request.headers['Mac'].encode('latin'):
+                print("INVALID MAC!")
+                return None
+            else:
+                print("Validated MAC!")
         else:
             print("\nIgnoring MIC for now...")
             # print("\nGot MIC (hash)...\n", request.headers['Mic'])
             # MIC = str(request.content.strip()).__hash__()
         # Validate certificate and signature
         cert = request.headers['Certificate'].replace(" ", "\n").replace("\n", " ", 1)[::-1].replace("\n", " ", 1)[::-1]+"\n"
-        print("\nGot cert\n", cert)
         if not self.pki.validateCerts(cert, [], pem=True):
             print("ERROR! The server certificate is not valid!")
             return None
