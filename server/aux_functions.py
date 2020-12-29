@@ -2,11 +2,13 @@
 import json
 import datetime
 from cryptography import x509
+from cryptography.hazmat.primitives import serialization
 
 import sys
 sys.path.append('..')
 from crypto_functions import CryptoFunctions
 from pki import PKI 
+from cc import CitizenCard
 
 LICENSE_VIEWS = 4
 LICENSE_SPAN = datetime.timedelta(minutes=5)
@@ -46,12 +48,22 @@ def register(username, password, signature, signcert, intermedium):
     else:
         print("It is valid! :)")
 
+    # Validate signature
+    valid = CitizenCard.validateSignature(
+        public_key = pki.cert.public_key(), 
+        message = (username+password).encode('latin'),
+        sign = signature.encode('latin')
+    )
+    print("\nValidating signature...", valid)
+    if not valid:
+        return None, "The signature is not valid!"
+
     # Create user
     user = {
         'username': username,
         'passwords': {},
         'views': LICENSE_VIEWS,
-        'time': (datetime.datetime.now() + LICENSE_SPAN).timestamp()
+        'time': (datetime.datetime.now() + LICENSE_SPAN).timestamp(),
     }
 
     # Create digests for password

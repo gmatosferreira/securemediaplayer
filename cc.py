@@ -1,5 +1,8 @@
 import PyKCS11
 from cryptography import x509
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes
 
 class CitizenCard:
 
@@ -67,7 +70,7 @@ class CitizenCard:
         return bytes(self.session.sign(self.private_key, message, mechanism))
 
     @staticmethod
-    def validateSignature(self, public_key, message, sign):
+    def validateSignature(public_key, message, sign):
         """
         This method is used to validate a signature of a message
         --- Parameteres
