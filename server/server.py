@@ -20,7 +20,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 import sys
 sys.path.append('..')
 from crypto_functions import CryptoFunctions
-from licenses import *
+from pki import PKI
 
 logger = logging.getLogger('root')
 FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
@@ -40,21 +40,56 @@ CATALOG = { '898a08080d1840793122b7e118b27a95d117ebce':
 
 CATALOG_BASE = 'catalog'
 CHUNK_SIZE = 1024 * 4  #block
+FILEPRIVATEKEY = '../keys/server_cert_key.pk8'
+FILECERTIFICATE = '../certificates/server_cert.pem'
+
+# Load server key
+with open('key.txt') as f:
+    KEY = f.read().strip()
+print("\nWorking with key:", KEY)
 
 class MediaServer(resource.Resource):
     isLeaf = True
 
     # Constructor
     def __init__(self):
-        print("Initializing server...")
-        # TODO Change on production to new parameters every initialization! 
-        # self.parameters = dh.generate_parameters(generator=2, key_size=2048)
+        print("\nInitializing server...")
+
+        # Load parameters
         with open('parameters', 'rb') as f:
             self.parameters = serialization.load_pem_parameters(f.read().strip())    
             print("Loaded parameters!")
 
+        # Load media files
+        self.MEDIA = dict()
+        print("\nLoading media...")
+        for _, c in CATALOG.items():
+            print(c['file_name'])
+            self.MEDIA[c['file_name']] = open(os.path.join(CATALOG_BASE, c['file_name']), 'rb').read()
+            # self.getFile(os.path.join(CATALOG_BASE, c['file_name'])).encode('latin')
+
+        # Load private key
+        fp = open(FILEPRIVATEKEY, 'rb')
+        self.private_key = serialization.load_pem_private_key(
+            fp.read(),
+            password = 'key'.encode('utf-8')
+        )
+        fp.close()
+        print("\nLoaded private key...\n", self.private_key)
+
+        # Load certificate
+        fc = open(FILECERTIFICATE, "rb")
+        self.cert = x509.load_pem_x509_certificate(fc.read())
+        fc.close()
+        print("\nLoaded certificate...\n", self.cert)
+
         # Initialize session dictionary
         self.sessions = {}
+
+        # Initialize pki
+        self.pki = PKI()
+
+        print("\nServer has been started!")
 
     # Send the server DH parameters
     def do_parameters(self, request):
@@ -95,6 +130,15 @@ class MediaServer(resource.Resource):
         invalid, session = self.invalidSession(request)
         if invalid: return invalid
 
+        # Validate license
+        if not licenseValid(self, session['username']):
+            return self.cipherResponse(
+                request = request,
+                response = {'error': 'License is not valid! Please renew it.'},
+                sessioninfo = session,
+                error = True
+            )
+
         # Build list
         media_list = []
         for media_id in CATALOG:
@@ -121,6 +165,15 @@ class MediaServer(resource.Resource):
         # Validate session and log in
         invalid, session = self.invalidSession(request)
         if invalid: return invalid
+
+        # Validate license
+        if not licenseValid(self, session['username']):
+            return self.cipherResponse(
+                request = request,
+                response = {'error': 'License is not valid! Please renew it.'},
+                sessioninfo = session,
+                error = True
+            )
 
         logger.debug(f'Download: args: {request.args}')
         
@@ -167,6 +220,17 @@ class MediaServer(resource.Resource):
         except:
             logger.warn("Chunk format is invalid")
 
+        # Update license for first chunk (decrement views)
+        if chunk_id==0:
+            user = updateLicense(self, session['username'], view=True)
+            if not user:
+                return self.cipherResponse(
+                    request = request,
+                    response = {'error': 'There was an error updating the license. Try again!'},
+                    sessioninfo = session,
+                    error = True
+                )
+
         if not valid_chunk:
             return self.cipherResponse(
                 request = request, 
@@ -182,21 +246,18 @@ class MediaServer(resource.Resource):
         offset = chunk_id * CHUNK_SIZE
 
         # Open file, seek to correct position and return the chunk
-        with open(os.path.join(CATALOG_BASE, media_item['file_name']), 'rb') as f:
-            f.seek(offset)
-            data = f.read(CHUNK_SIZE)
-            message = {
-                'media_id': media_id, 
-                'chunk': chunk_id, 
-                'data': binascii.b2a_base64(data).decode('latin').strip()
-            }
-            return self.cipherResponse(
-                request = request, 
-                response = message, 
-                sessioninfo = session,
-                append = bytes(chunk_id)
-            )
-            
+        data = self.MEDIA[media_item['file_name']][offset:offset+CHUNK_SIZE]
+        message = {
+            'media_id': media_id, 
+            'chunk': chunk_id, 
+            'data': binascii.b2a_base64(data).decode('latin').strip()
+        }
+        return self.cipherResponse(
+            request = request, 
+            response = message, 
+            sessioninfo = session,
+            append = bytes(chunk_id)
+        )
 
         # File was not open?
         return self.cipherResponse(
@@ -206,6 +267,27 @@ class MediaServer(resource.Resource):
             append = bytes(chunk_id),
             error = True
         )
+
+    def do_license(self, request):
+        """
+        This method allows the client to look up his license status
+        """
+        # Validate session and log in
+        invalid, session = self.invalidSession(request)
+        if invalid: return invalid
+
+        license = getLicense(self, session['username'])
+        return self.cipherResponse(
+            request = request, 
+            response = {
+                'success': 'Here is your license! :)',
+                'views': license['views'],
+                'time': license['time'],
+            }, 
+            sessioninfo = session
+        )
+
+
 
     # Handle a GET request
     def render_GET(self, request):
@@ -219,13 +301,12 @@ class MediaServer(resource.Resource):
             #elif request.uri == 'api/key':
             #...
             #elif request.uri == 'api/auth':
-
             elif request.path == b'/api/list':
                 return self.do_list(request)
-
             elif request.path == b'/api/download':
-                print("OK")
                 return self.do_download(request)
+            elif request.path == b'/api/license':
+                return self.do_license(request)
                 
        
             
@@ -241,12 +322,14 @@ class MediaServer(resource.Resource):
             return b''
         
     """
-    This method allows the client to register at the server (send his public key)
+    This method allows the client to start a new session at the server 
+    --- Start
+    The client sends his public key
     The server generates a key pair for that client and a shared key based on those
     It also generates a session id for client
     Answers to client the server public key and the session id
     """
-    def do_register(self, request):
+    def do_session(self, request):
         data = request.args
         if data == None or data == '':
             print('Data is none or empty')
@@ -304,18 +387,20 @@ class MediaServer(resource.Resource):
             'cipher': CIPHER,
             'digest': DIGEST,
             'mode': CIPHER_MODE,
-            'authenticated': False
+            'authenticated': False,
+            'data': None 
         }
 
         # 7. Return public key to client
         request.responseHeaders.addRawHeader(b"sessionid", sessionid.bytes)
-        return json.dumps({
-            'public_key': pk.decode('utf-8'),
-        }).encode('latin')
+        return self.rawResponse(
+            request = request,
+            response = {'public_key': pk.decode('utf-8')}
+        )
 
     
     """
-    This method handles the client authentication
+    This method handles the client authentication (log in and log out)
     To authenticate, the client must have started a session!
     """
     def do_auth(self, request, registration = False):
@@ -337,8 +422,23 @@ class MediaServer(resource.Resource):
                 error = True
             )
 
+        # If logout, log user out, 
+        if 'logout' in data and data['logout']:
+            print("\nLOG OUT")
+            session['authenticated'] = False
+            return self.cipherResponse(
+                request = request, 
+                response = {
+                    'success': 'The user has been sucessfully logged out!'
+                }, 
+                sessioninfo = session,
+            )
+
         # Validate that payload has data
-        if not data or not all(attr in data and data[attr] for attr in ['username', 'password']):
+        invalid = not data
+        invalid = invalid or not all(attr in data and data[attr] for attr in ['username', 'password', 'signature'])
+        invalid = invalid or (registration and not all(attr in data and data[attr] for attr in ['signcert', 'intermedium']))
+        if invalid:
             return self.cipherResponse(
                 request = request, 
                 response = {'error': 'Payload is not valid!'}, 
@@ -352,8 +452,6 @@ class MediaServer(resource.Resource):
                 request = request, 
                 response = {
                     'success': 'The user is already logged!',
-                    'views': session['data']['views'],
-                    'time': session['data']['time']
                 }, 
                 sessioninfo = session,
             )
@@ -361,56 +459,120 @@ class MediaServer(resource.Resource):
         print("\nData received is...\n", data)
         # Validate data
         if not registration:
-            userData = authenticate(data['username'], data['password'], session)
+            userData, error = authenticate(self, data['username'], data['password'], data['signature'], session)
         else:
-            userData = register(data['username'], data['password'])
+            userData, error = register(self, data['username'], data['password'], data['signature'], data['signcert'], data['intermedium'])
         # If authenticated/registered sucessfully
         if userData:
             if not registration:
                 session['authenticated'] = True
-                session['data'] = userData
+                session['username'] = userData['username']
                 message = 'The user was authenticated sucessfully!'
             else:
                 message = 'The user was registered sucessfully!'
             return self.cipherResponse(
                 request = request, 
                 response = {
-                    'success': message,
-                    'views': userData['views'],
-                    'time': userData['time']
+                    'success': message
                 }, 
                 sessioninfo = session,
             )
 
         return self.cipherResponse(
             request = request, 
-            response = {'error': 'The sent data is not valid!'}, 
+            response = {'error':  'The sent data is not valid!' if not error else error}, 
             sessioninfo = session,
             error = True
         )
-                
 
-    #login and create new license
-    
-    def new_license(self, request):
-        data = request.args
-        username, password = ""
-        if data == None or data == '':
-            print('Data is none or empty')
-        else:
-            self.username  = request.args[b'username'][0].decode('utf-8')
-            password = request.args[b'passowrd'][0].decode('utf-8')
-        add_new_license( self.username,password)
-   
-    """
-    #logout and update license
-    def update_license(self, request):
-        data = request.args
-        if data == None or data == '':
-            print('Data is none or empty')
-        else:
-            self.USERNAME = request.args[b'username'][0].decode('utf-8')
-    """    
+    def do_session_end(self, request):
+        """
+        This method allows client to end his session
+        """
+        print("\n\nEND SESSION")
+        # Process request 
+        # (Get session and decipher payload)
+        session, data = self.processRequest(request)
+        
+        print("Session:", session)
+        print("Open sessions are:", self.sessions.keys())
+
+        # Validate that client has open session
+        if not session:
+            return self.rawResponse(
+                request = request,
+                response = {'error': 'Client does not have a valid session!'},
+                error = True
+            )
+
+        # If so, delete it
+        for id, s in self.sessions.items():
+            if s == session:
+                self.sessions.pop(id)
+                print("Poped session!")
+                print("Open sessions are:", self.sessions.keys())
+                return self.cipherResponse(
+                    request = request, 
+                    response = {
+                        'success': 'The session was ended successfully!',
+                    }, 
+                    sessioninfo = session,
+                )
+
+        return self.cipherResponse(
+            request = request, 
+            response = {
+                'success': 'An error occured! Try again!',
+            }, 
+            sessioninfo = session,
+            error = True
+        )
+
+    def do_renew_license(self, request):
+        """
+        This method allows the client to renew his certificate with the server
+        """
+        # Validate session and log in
+        invalid, session = self.invalidSession(request)
+        if invalid: return invalid
+
+        # Get payload
+        session, data = self.processRequest(request)
+        if not data or 'renew' not in data or not data['renew']:
+            return self.cipherResponse(
+                request = request,
+                response = {
+                    'error': 'Invalid payload! Try again!'
+                },
+                sessioninfo = session,
+                error=True,
+            ) 
+
+
+        # Renew it
+        user = updateLicense(self, session['username'], renew=True)
+
+        if not user:
+            return self.cipherResponse(
+                request = request,
+                response = {
+                    'error': 'An error occured! Try again!'
+                },
+                sessioninfo = session,
+                error=True,
+            )  
+            
+        return self.cipherResponse(
+            request = request,
+            response = {
+                'success': 'The license was successfully renewed!',
+                'views': user['views'],
+                'time': user['time']
+            },
+            sessioninfo = session,
+        )
+
+
 
     # Handle a POST request
     def render_POST(self, request):
@@ -418,16 +580,16 @@ class MediaServer(resource.Resource):
         try:
             if request.path == b'/api/suite':
                 return self.process_negotiation(request)
-            elif request.path == b'/api/register':
-                return self.do_register(request)
+            elif request.path == b'/api/session':
+                return self.do_session(request)
             elif request.path == b'/api/newuser':
                 return self.do_auth(request, registration=True)
             elif request.path == b'/api/auth':
                 return self.do_auth(request)
-            elif request.path == b'/api/newLicense':
-                return self.new_license(request)
-
-          
+            elif request.path == b'/api/sessionend':
+                return self.do_session_end(request)
+            elif request.path == b'/api/renew':
+                return self.do_renew_license(request)
         
         except Exception as e:
             logger.exception(e)
@@ -466,8 +628,13 @@ class MediaServer(resource.Resource):
         # Generate MIC
         MIC = CryptoFunctions.create_digest(cryptogram, sessioninfo['digest'])
         print("\nGenerated MIC:\n", MIC)
+        # Sign request with private key
+        SIGN = CryptoFunctions.signingRSA(cryptogram, self.private_key)
+        print("\nGenerated signature:\n", SIGN)
         # Add headers
         request.responseHeaders.addRawHeader(b"mic", MIC)
+        request.responseHeaders.addRawHeader(b"signature", SIGN)
+        request.responseHeaders.addRawHeader(b"certificate", self.cert.public_bytes(encoding = serialization.Encoding.PEM))
         request.responseHeaders.addRawHeader(b"ciphered", b"True")
         request.responseHeaders.addRawHeader(b"content-type", b"application/json")
         if error:
@@ -495,8 +662,13 @@ class MediaServer(resource.Resource):
         # Generate pseudo MIC
         MIC = str(str(message).__hash__()).encode('latin')
         print("\nGenerated pseudo MIC:\n", MIC)
+        # Sign request with private keya
+        SIGN = CryptoFunctions.signingRSA(message, self.private_key)
+        print("\nGenerated signature:\n", SIGN)
         # Add headers
         request.responseHeaders.addRawHeader(b"mic", MIC)
+        request.responseHeaders.addRawHeader(b"signature", SIGN)
+        request.responseHeaders.addRawHeader(b"certificate", self.cert.public_bytes(encoding = serialization.Encoding.PEM))
         request.responseHeaders.addRawHeader(b"ciphered", b'False')
         request.responseHeaders.addRawHeader(b"content-type", b"application/json")
         if error:
@@ -553,12 +725,14 @@ class MediaServer(resource.Resource):
         This method gets the session for the token sent on request header
         """
         headers = request.getAllHeaders()
+        print("Sessionid", headers[b'sessionid'], type(headers[b'sessionid']))
         sessionid = uuid.UUID(bytes=headers[b'sessionid'])
         if sessionid not in self.sessions.keys():
             print(f"\nInvalid session! ({sessionid})")
             return None
         session = self.sessions[sessionid]
         print("\nSession", sessionid)
+        print(session)
         return session
 
     # Validate that client has open session
@@ -581,12 +755,56 @@ class MediaServer(resource.Resource):
         elif not session['authenticated']:
             return self.cipherResponse(
                 request = request,
-                response = {'error': 'Client must be logged in to consume media!'},
+                response = {'error': 'Client must be logged in to access this resource!'},
                 sessioninfo = session,
                 error = True
             ), None
         return None, session
 
+    # Server files
+    def getFile(self, location):
+        """
+        Loads encrypted file at server folder
+        - Parameters
+        location        String      The file location
+        - Returns
+        content         String      The file decripted
+        """
+        print(f"\ngetFile({location})")
+        # Load file
+        content = open(location, 'rb').read()
+        # Descript it
+        return CryptoFunctions.symetric_encryption(
+            key = KEY.encode('latin'),
+            message = content,
+            algorithm_name = "AES",
+            digest_mode = "SHA512",
+            cypher_mode = "CBC",
+            encode = False
+        ).decode('latin')
+        
+    def updateFile(self, location, content):
+        """
+        Loads the content of an encripted file at server 
+        - Parameters
+        location        String      The file location
+        content         String      The content to update with
+        - Returns
+        content         String      The file decripted
+        """
+        print(f"\nupdateFile({location})")
+        # Generate cryptogram
+        cryptogram = CryptoFunctions.symetric_encryption(
+            key = KEY.encode('latin'),
+            message = content.encode('latin'),
+            algorithm_name = "AES",
+            digest_mode = "SHA512",
+            cypher_mode = "CBC",
+            encode = True
+        )
+        # Save to file
+        open(location, 'wb').write(cryptogram)
+        
 
 print("Server started")
 print("URL is: http://IP:8080")
