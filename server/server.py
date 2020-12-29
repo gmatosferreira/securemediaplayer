@@ -226,10 +226,6 @@ class MediaServer(resource.Resource):
 
         # Open file, seek to correct position and return the chunk
         data = self.MEDIA[media_item['file_name']][offset:offset+CHUNK_SIZE]
-        with open('media.txt', 'a') as f:
-            f.write(f"\nChunk {chunk_id}\n")
-            f.write(data.decode('latin'))
-            f.write("\n")
         message = {
             'media_id': media_id, 
             'chunk': chunk_id, 

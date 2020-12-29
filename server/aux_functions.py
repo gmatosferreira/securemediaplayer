@@ -220,4 +220,4 @@ def authenticate(server, username, password, signature, sessionData):
 
     # If not found, return None
     print("User not found...")
-    return None
+    return None, ""

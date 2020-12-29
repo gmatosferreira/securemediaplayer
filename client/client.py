@@ -147,7 +147,11 @@ class MediaClient:
         print("| 6. Exit                              |")
         print("|--------------------------------------|\n")
 
-        op = int(input("What is your option? "))
+        op = input("What is your option? ").strip()
+        if not op.isdigit():
+            print("Invalid option")
+            return
+        op = int(op)
 
         if op == 1:
             if not self.logged:
@@ -187,9 +191,13 @@ class MediaClient:
         
         url = f'{self.SERVER_URL}/api/auth' if not registration else f'{self.SERVER_URL}/api/newuser'
         while True:
-            username = input("Username (ENTER to exit): ")
-            password = input("Password (ENTER to exit): ")
-            if not username or not password: break
+            username = input("Username (ENTER to exit): ").strip()
+            if not username: break
+            if len(username.split(" "))!=1:
+                print("Username must be a single word! Spaces are not supported!")
+                continue
+            password = input("Password (ENTER to exit): ").strip()
+            if not password: break
             # Create digest for password
             if not registration:
                 passwordDigest = CryptoFunctions.create_digest(password.encode('latin'), self.DIGEST).decode('latin')
