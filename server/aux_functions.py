@@ -13,11 +13,12 @@ from cc import CitizenCard
 LICENSE_VIEWS = 4
 LICENSE_SPAN = datetime.timedelta(minutes=5)
 
-def register(username, password, signature, signcert, intermedium):
+def register(server, username, password, signature, signcert, intermedium):
     """
     This function handles the registration of a new user at server
     It gives the user a default license of 5 views
     --- Parameters
+    server          MediaServer     The server that calls the method
     username        String          The user username
     password        String          The raw password
     signature       String          The username+password signature
@@ -31,7 +32,11 @@ def register(username, password, signature, signcert, intermedium):
     if not username or not password: return None, "There are attributes missing!"
 
     # Load users
-    users = json.load(open('../licenses.json', 'r'))
+    usersfile = server.getFile('./licenses.json')
+    if not usersfile:
+        users = []
+    else:
+        users = json.loads(usersfile)
 
     # Check that user is not registered yet
     for u in users:
@@ -77,16 +82,22 @@ def register(username, password, signature, signcert, intermedium):
     users.append(user)
 
     # Update file
-    json.dump(users, open('../licenses.json', 'w'))
+    server.updateFile('./licenses.json', json.dumps(users))
 
     return user, ""
 
-def getLicense(username):
+def getLicense(server, username):
     """
     This method returns a license for a user given his username
+    - Parameters
+    server          MediaServer     The server that calls the method
     """
     # Load users
-    users = json.load(open('../licenses.json', 'r'))
+    usersfile = server.getFile('./licenses.json')
+    if not usersfile:
+        users = []
+    else:
+        users = json.loads(usersfile)
 
     # Find user on file
     for u in users:
@@ -114,10 +125,11 @@ def licenseValid(username):
     # If passed validations, license is valid!
     return True
     
-def updateLicense(username, renew = False, view = False):
+def updateLicense(server, username, renew = False, view = False):
     """
     This method updates a user license
     --- Parameters 
+    server          MediaServer     The server that calls the method
     renew           If wants to renew license
     view            If wants to decrement views
     --- Returns 
@@ -127,7 +139,11 @@ def updateLicense(username, renew = False, view = False):
     if not username: return None
 
     # Load users
-    users = json.load(open('../licenses.json', 'r'))
+    usersfile = server.getFile('./licenses.json')
+    if not usersfile:
+        users = []
+    else:
+        users = json.loads(usersfile)
 
     # Find user on file
     user = None
@@ -149,14 +165,15 @@ def updateLicense(username, renew = False, view = False):
     
     # Update users list (and file)
     users[userindex] = user
-    json.dump(users, open('../licenses.json', 'w'))
+    server.updateFile('./licenses.json', json.dumps(users))
 
     return user
 
-def authenticate(username, password, signature, sessionData):
+def authenticate(server, username, password, signature, sessionData):
     """
     This function authenticates a user given its password
     --- Parameters
+    server          MediaServer     The server that calls the method
     username        String
     password        String (digest)
     signature       String          The username+password signature
@@ -167,7 +184,11 @@ def authenticate(username, password, signature, sessionData):
     """
     print("\nAUTHENTICATE")
     # Load users
-    users = json.load(open('../licenses.json', 'r'))
+    usersfile = server.getFile('./licenses.json')
+    if not usersfile:
+        users = []
+    else:
+        users = json.loads(usersfile)
     
     # Find user object
     for u in users:

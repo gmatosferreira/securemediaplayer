@@ -40,6 +40,11 @@ CATALOG = { '898a08080d1840793122b7e118b27a95d117ebce':
 CATALOG_BASE = 'catalog'
 CHUNK_SIZE = 1024 * 4  #block
 
+# Load server key
+with open('key.txt') as f:
+    KEY = f.read().strip()
+print("Working with key:", KEY)
+
 class MediaServer(resource.Resource):
     isLeaf = True
 
@@ -186,7 +191,7 @@ class MediaServer(resource.Resource):
 
         # Update license for first chunk (decrement views)
         if chunk_id==0:
-            user = updateLicense(session['username'], view=True)
+            user = updateLicense(self, session['username'], view=True)
             if not user:
                 return self.cipherResponse(
                     request = request,
@@ -243,7 +248,7 @@ class MediaServer(resource.Resource):
         invalid, session = self.invalidSession(request)
         if invalid: return invalid
 
-        license = getLicense(session['username'])
+        license = getLicense(self, session['username'])
         return self.cipherResponse(
             request = request, 
             response = {
@@ -425,9 +430,9 @@ class MediaServer(resource.Resource):
         print("\nData received is...\n", data)
         # Validate data
         if not registration:
-            userData, error = authenticate(data['username'], data['password'], data['signature'], session)
+            userData, error = authenticate(self, data['username'], data['password'], data['signature'], session)
         else:
-            userData, error = register(data['username'], data['password'], data['signature'], data['signcert'], data['intermedium'])
+            userData, error = register(self, data['username'], data['password'], data['signature'], data['signcert'], data['intermedium'])
         # If authenticated/registered sucessfully
         if userData:
             if not registration:
@@ -516,7 +521,7 @@ class MediaServer(resource.Resource):
 
 
         # Renew it
-        user = updateLicense(session['username'], renew=True)
+        user = updateLicense(self, session['username'], renew=True)
 
         if not user:
             return self.cipherResponse(
@@ -717,6 +722,50 @@ class MediaServer(resource.Resource):
             ), None
         return None, session
 
+    # Server files
+    def getFile(self, location):
+        """
+        Loads encrypted file at server folder
+        - Parameters
+        location        String      The file location
+        - Returns
+        content         String      The file decripted
+        """
+        print(f"\ngetFile({location})")
+        # Load file
+        content = open(location, 'rb').read()
+        # Descript it
+        return CryptoFunctions.symetric_encryption(
+            key = KEY.encode('latin'),
+            message = content,
+            algorithm_name = "AES",
+            digest_mode = "SHA512",
+            cypher_mode = "CBC",
+            encode = False
+        ).decode('latin')
+        
+    def updateFile(self, location, content):
+        """
+        Loads the content of an encripted file at server 
+        - Parameters
+        location        String      The file location
+        content         String      The content to update with
+        - Returns
+        content         String      The file decripted
+        """
+        print(f"\nupdateFile({location})")
+        # Generate cryptogram
+        cryptogram = CryptoFunctions.symetric_encryption(
+            key = KEY.encode('latin'),
+            message = content.encode('latin'),
+            algorithm_name = "AES",
+            digest_mode = "SHA512",
+            cypher_mode = "CBC",
+            encode = True
+        )
+        # Save to file
+        open(location, 'wb').write(cryptogram)
+        
 
 print("Server started")
 print("URL is: http://IP:8080")
