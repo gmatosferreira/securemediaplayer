@@ -36,11 +36,13 @@ def load_cert_key(file):
 """
 def load_all_certs():
         #load server cert
-        server_cert = load_cert("certificates/server_cert.pem")
-
-        ca_cert = load_cert("certificates/CA_cert.pem" )
+        client_cert = load_cert("certificates/client_localhost.pem")
+        server_cert = load_cert("certificates/server_localhost.pem")
+        ca_cert = load_cert("certificates/SIO_CA.pem" )
         
-        rsa_private_key = load_cert_key("keys/server_cert_key.pk8")
+        rsa_private_key = load_cert_key("keys/client_localhost.pk8")
+        rsa_privateKey = load_cert_key("keys/server_localhost.pk8")
+
 
 
 if __name__ == '__main__':
