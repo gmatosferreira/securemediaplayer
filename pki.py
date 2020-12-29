@@ -45,19 +45,19 @@ class PKI:
         print("\nGot cert\n", cert)
 
         # Load intermedium certs
-        intermedium = {}
+        intermediumCerts = {}
         for c in intermedium:
             if pem:
                 pkic = x509.load_pem_x509_certificate(c.encode('latin'))
             else:
                 pkic = x509.load_der_x509_certificate(c.encode('latin'))
-            intermedium[pkic.subject] = pkic
-        print("\nGot intermedium certs list...\n", intermedium)
+            intermediumCerts[pkic.subject] = pkic
+        print("\nGot intermedium certs list...\n", intermediumCerts)
 
-        return PKI.validateCertHierarchy(cert, intermedium, self.trustedcerts)
+        return PKI.validateCertHierarchy(cert, intermediumCerts, self.trustedcerts)
 
     @staticmethod
-    def getCert(fileLocation, pem=True):
+    def getCert(fileLocation, pem = False):
         """
         This method allows to load a certificate from a file
         """
@@ -69,6 +69,18 @@ class PKI:
         else:
             cert = x509.load_der_x509_certificate(data)
         f.close()
+        return cert
+
+    @staticmethod
+    def getCertFromString(certString, pem = False):
+        """
+        This method allows to load a certificate from a file
+        """
+        data = certString.encode('latin')
+        if pem:
+            cert = x509.load_pem_x509_certificate(data)
+        else:
+            cert = x509.load_der_x509_certificate(data)
         return cert
 
     @staticmethod
