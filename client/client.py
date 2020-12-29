@@ -206,8 +206,8 @@ class MediaClient:
                 payload['signcert'] = cc.cert.public_bytes(serialization.Encoding.DER).decode('latin')
                 payload['intermedium'] = [c.public_bytes(serialization.Encoding.DER).decode('latin') for c in cc.intermedium]
                 print("\nEncoded CC public key...\n", payload['signcert'])
-            data, MIC  = self.cipher(payload)
-            headers = {'mic': MIC, 'sessionid': self.sessionid.bytes}
+            data, MIC, SIGNATURE  = self.cipher(payload)
+            headers = {'mic': MIC, 'sessionid': self.sessionid.bytes, 'signature': SIGNATURE, 'certificate': CERTIFATE}
             # POST to server
             req = requests.post(url, data = data, headers = headers)
             # Process server response
@@ -408,7 +408,9 @@ class MediaClient:
         MIC = CryptoFunctions.create_digest(cryptogram, self.DIGEST).strip()
         print("Generated MIC:\n",MIC)
 
-        return cryptogram, MIC
+        # Assinatura do payload com chave privada do cliente
+
+        return cryptogram, MIC, SIGNATURE
     
     # Response
     def processResponse(self, request, append=None, ciphered=True):
