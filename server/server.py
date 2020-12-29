@@ -43,22 +43,32 @@ CHUNK_SIZE = 1024 * 4  #block
 # Load server key
 with open('key.txt') as f:
     KEY = f.read().strip()
-print("Working with key:", KEY)
+print("\nWorking with key:", KEY)
 
 class MediaServer(resource.Resource):
     isLeaf = True
 
     # Constructor
     def __init__(self):
-        print("Initializing server...")
-        # TODO Change on production to new parameters every initialization! 
-        # self.parameters = dh.generate_parameters(generator=2, key_size=2048)
+        print("\nInitializing server...")
+
+        # Load parameters
         with open('parameters', 'rb') as f:
             self.parameters = serialization.load_pem_parameters(f.read().strip())    
             print("Loaded parameters!")
 
+        # Load media files
+        self.MEDIA = dict()
+        print("\nLoading media...")
+        for _, c in CATALOG.items():
+            print(c['file_name'])
+            self.MEDIA[c['file_name']] = open(os.path.join(CATALOG_BASE, c['file_name']), 'rb').read()
+            # self.getFile(os.path.join(CATALOG_BASE, c['file_name'])).encode('latin')
+
         # Initialize session dictionary
         self.sessions = {}
+
+        print("\nServer has been started!")
 
     # Send the server DH parameters
     def do_parameters(self, request):
@@ -215,21 +225,22 @@ class MediaServer(resource.Resource):
         offset = chunk_id * CHUNK_SIZE
 
         # Open file, seek to correct position and return the chunk
-        with open(os.path.join(CATALOG_BASE, media_item['file_name']), 'rb') as f:
-            f.seek(offset)
-            data = f.read(CHUNK_SIZE)
-            message = {
-                'media_id': media_id, 
-                'chunk': chunk_id, 
-                'data': binascii.b2a_base64(data).decode('latin').strip()
-            }
-            return self.cipherResponse(
-                request = request, 
-                response = message, 
-                sessioninfo = session,
-                append = bytes(chunk_id)
-            )
-            
+        data = self.MEDIA[media_item['file_name']][offset:offset+CHUNK_SIZE]
+        with open('media.txt', 'a') as f:
+            f.write(f"\nChunk {chunk_id}\n")
+            f.write(data.decode('latin'))
+            f.write("\n")
+        message = {
+            'media_id': media_id, 
+            'chunk': chunk_id, 
+            'data': binascii.b2a_base64(data).decode('latin').strip()
+        }
+        return self.cipherResponse(
+            request = request, 
+            response = message, 
+            sessioninfo = session,
+            append = bytes(chunk_id)
+        )
 
         # File was not open?
         return self.cipherResponse(

@@ -289,8 +289,8 @@ class MediaClient:
 
             # TODO: Process chunk
 
-            if not media:
-                print("\nGot empty chunk!!")
+            if not media or 'error' in media:
+                print("\nGot empty or invalid chunk!!")
                 continue
 
             data = binascii.a2b_base64(media['data'].encode('latin'))

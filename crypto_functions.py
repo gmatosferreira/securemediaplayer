@@ -115,7 +115,6 @@ class CryptoFunctions:
         if len(key)*8 != 256:
             key = CryptoFunctions.create_digest(key, digest_mode)
         print(f"Symetric encription with key of size {len(key)*8}...")
-        print("Message is:\n", message)
 
         # Define algorithm
         algorithm = None
@@ -167,9 +166,9 @@ class CryptoFunctions:
             criptograma += iv
 
         # Iterate over blocks
+        print(f"# Starting from 0 to {len(message)+1} with jumps of {blockLength}")
         for i in range(0,len(message)+1,blockLength):
             data = message[i:i+blockLength] if i < len(message) else b''
-            print(data, len(data))
             # If data has block size, just encrypt
             if len(data) == blockLength:
                 criptograma += cryptor.update(data)
@@ -180,6 +179,7 @@ class CryptoFunctions:
                     padding_length = blockLength - len(data)
                     padding = [padding_length] * (padding_length)
                     criptograma += cryptor.update(data + bytes(padding))
+        print()
     
         # Add finalization on both modes
         criptograma += cryptor.finalize()
