@@ -37,10 +37,17 @@ def load_cert_key(file):
 def load_all_certs():
         #load server cert
         server_cert = load_cert("certificates/server_cert.pem")
+        print(server_cert)
+        print(server_cert.issuer)
+        print(server_cert.subject)
 
-        ca_cert = load_cert("certificates/CA_cert.pem" )
+        ca_cert = load_cert("certsca/CA_cert.pem" )
+        print(ca_cert)
+        print(ca_cert.issuer)
+        print(ca_cert.subject)
         
         rsa_private_key = load_cert_key("keys/server_cert_key.pk8")
+        print(rsa_private_key)
 
 
 if __name__ == '__main__':

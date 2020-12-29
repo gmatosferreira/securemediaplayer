@@ -7,11 +7,12 @@ class PKI:
 
     TRUSTEDCERTS = {
         # Folder: PEM format?
-        '../certs': False,
+        '../certscc': False,
+        '../certsca': True,
         '/etc/ssl/certs': True,
     }
 
-    def __init__(self, certificate, intermedium):
+    def __init__(self, certificate, intermedium, pem = False):
         """
         This class must be initialized with a cert to validate and a list of intermedium ones
         --- Parameters
@@ -21,20 +22,25 @@ class PKI:
         print("\nPKI")
 
         # Load certificate
-        self.cert = x509.load_der_x509_certificate(certificate.encode('latin'))
+        if pem:
+            self.cert = x509.load_pem_x509_certificate(certificate.encode('latin'))
+        else:
+            self.cert = x509.load_der_x509_certificate(certificate.encode('latin'))
         print("\nGot cert\n", self.cert)
 
         # Load intermedium certs
         self.intermedium = {}
         for c in intermedium:
-            pkic = x509.load_der_x509_certificate(c.encode('latin'))
+            if pem:
+                pkic = x509.load_pem_x509_certificate(c.encode('latin'))
+            else:
+                pkic = x509.load_der_x509_certificate(c.encode('latin'))
             self.intermedium[pkic.subject] = pkic
         print("\nGot intermedium certs list...\n", self.intermedium)
 
         # Get all system certs
         self.systemcerts = {}
         for folder, pem in PKI.TRUSTEDCERTS.items():
-            print(f"Loading trusted certs from {folder}...")
             for file in os.scandir(folder):
                 # Validate if it is a certificate
                 if not file.is_file():

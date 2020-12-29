@@ -22,7 +22,7 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 import sys
 sys.path.append('..')
 
-
+from pki import PKI
 from crypto_functions import CryptoFunctions
 logger = logging.getLogger('root')
 FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
@@ -456,6 +456,14 @@ class MediaClient:
             print("\nIgnoring MIC for now...")
             # print("\nGot MIC (hash)...\n", request.headers['Mic'])
             # MIC = str(request.content.strip()).__hash__()
+        # Validate certificate and signature
+        cert = request.headers['Certificate'].replace(" ", "\n").replace("\n", " ", 1)[::-1].replace("\n", " ", 1)[::-1]+"\n"
+        pki = PKI(cert, [], pem=True)
+        if not pki.validateCerts():
+            print("ERROR! The server certificate is not valid!")
+            return None
+        else:
+            print("\nThe server certificate is valid!")
         # Check if response is ciphered
         if not ciphered:
             print("\nResponse is not ciphered!")

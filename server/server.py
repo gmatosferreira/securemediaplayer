@@ -39,6 +39,8 @@ CATALOG = { '898a08080d1840793122b7e118b27a95d117ebce':
 
 CATALOG_BASE = 'catalog'
 CHUNK_SIZE = 1024 * 4  #block
+FILEPRIVATEKEY = '../keys/server_cert_key.pk8'
+FILECERTIFICATE = '../certificates/server_cert.pem'
 
 # Load server key
 with open('key.txt') as f:
@@ -64,6 +66,21 @@ class MediaServer(resource.Resource):
             print(c['file_name'])
             self.MEDIA[c['file_name']] = open(os.path.join(CATALOG_BASE, c['file_name']), 'rb').read()
             # self.getFile(os.path.join(CATALOG_BASE, c['file_name'])).encode('latin')
+
+        # Load private key
+        fp = open(FILEPRIVATEKEY, 'rb')
+        self.private_key = serialization.load_pem_private_key(
+            fp.read(),
+            password = 'key'.encode('utf-8')
+        )
+        fp.close()
+        print("\nLoaded private key...\n", self.private_key)
+
+        # Load certificate
+        fc = open(FILECERTIFICATE, "rb")
+        self.cert = x509.load_pem_x509_certificate(fc.read())
+        fc.close()
+        print("\nLoaded certificate...\n", self.cert)
 
         # Initialize session dictionary
         self.sessions = {}
@@ -372,9 +389,10 @@ class MediaServer(resource.Resource):
 
         # 7. Return public key to client
         request.responseHeaders.addRawHeader(b"sessionid", sessionid.bytes)
-        return json.dumps({
-            'public_key': pk.decode('utf-8'),
-        }).encode('latin')
+        return self.rawResponse(
+            request = request,
+            response = {'public_key': pk.decode('utf-8')}
+        )
 
     
     """
@@ -606,8 +624,13 @@ class MediaServer(resource.Resource):
         # Generate MIC
         MIC = CryptoFunctions.create_digest(cryptogram, sessioninfo['digest'])
         print("\nGenerated MIC:\n", MIC)
+        # Sign request with private key
+        SIGN = CryptoFunctions.signingRSA(cryptogram, self.private_key)
+        print("\nGenerated signature:\n", SIGN)
         # Add headers
         request.responseHeaders.addRawHeader(b"mic", MIC)
+        request.responseHeaders.addRawHeader(b"signature", SIGN)
+        request.responseHeaders.addRawHeader(b"certificate", self.cert.public_bytes(encoding = serialization.Encoding.PEM))
         request.responseHeaders.addRawHeader(b"ciphered", b"True")
         request.responseHeaders.addRawHeader(b"content-type", b"application/json")
         if error:
@@ -635,8 +658,13 @@ class MediaServer(resource.Resource):
         # Generate pseudo MIC
         MIC = str(str(message).__hash__()).encode('latin')
         print("\nGenerated pseudo MIC:\n", MIC)
+        # Sign request with private keya
+        SIGN = CryptoFunctions.signingRSA(message, self.private_key)
+        print("\nGenerated signature:\n", SIGN)
         # Add headers
         request.responseHeaders.addRawHeader(b"mic", MIC)
+        request.responseHeaders.addRawHeader(b"signature", SIGN)
+        request.responseHeaders.addRawHeader(b"certificate", self.cert.public_bytes(encoding = serialization.Encoding.PEM))
         request.responseHeaders.addRawHeader(b"ciphered", b'False')
         request.responseHeaders.addRawHeader(b"content-type", b"application/json")
         if error:
