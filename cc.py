@@ -13,27 +13,25 @@ class CitizenCard:
         pkcs11 = PyKCS11.PyKCS11Lib()
         pkcs11.load('/usr/local/lib/libpteidpkcs11.so')
         slots = pkcs11.getSlotList()
-        for slot in slots:
-            print("\n--- Slot", slot)
-            token = pkcs11.getTokenInfo(slot)
-            print(token)
         if len(slots) != 1:
             print(f"\nThere are {len(slots)} cart slot(s) available! Can't handle it...")
             exit()
         self.slot = slots[0]
 
         # 2. Get the certificates for signature
-        session = pkcs11.openSession(slot)
+        session = pkcs11.openSession(self.slot)
 
         # 2.1. Get private key
         self.private_key = session.findObjects([
             (PyKCS11.CKA_CLASS, PyKCS11.CKO_PRIVATE_KEY),
             (PyKCS11.CKA_LABEL, 'CITIZEN AUTHENTICATION KEY'),
         ])[0]
-        print("\nLoaded private key...\n", self.private_key)
+        print("Loaded private key...")
 
         # 2.2. Get public key
         self.public_key = None
+        all_attr = list(PyKCS11.CKA.keys())
+        all_attr = [e for e in all_attr if isinstance(e, int)]  # Filter
         for obj in session.findObjects():
             # Get object attributes
             attr = session.getAttributeValue(obj, all_attr)
@@ -42,12 +40,13 @@ class CitizenCard:
 
             if attr['CKA_LABEL'] == 'CITIZEN AUTHENTICATION CERTIFICATE':
                 self.public_key = x509.load_der_x509_certificate(bytes(attr['CKA_VALUE'])).public_key()
-        print("\nLoaded public key...\n", self.private_key)
+        print("Loaded public key...")
 
         # 2.3. Validate
         if not self.private_key or not self.public_key:
             print("\nERROR! Could not load keys...")
             exit()
+        print()
 
     def sign(self, message):
         """
