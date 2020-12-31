@@ -230,6 +230,8 @@ class MediaClient:
             if req.status_code != 200:
                 self.responseError(req, reqResp)
             else:
+                if not registration:
+                    self.logged = True
                 print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
                 break
 
