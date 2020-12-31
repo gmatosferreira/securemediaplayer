@@ -33,9 +33,9 @@ CATALOG = { '898a08080d1840793122b7e118b27a95d117ebce':
                 'name': 'Sunny Afternoon - Upbeat Ukulele Background Music',
                 'album': 'Upbeat Ukulele Background Music',
                 'description': 'Nicolai Heidlas Music: http://soundcloud.com/nicolai-heidlas',
-                'duration': 3*60+33,
-                'file_name': '898a08080d1840793122b7e118b27a95d117ebce.mp3',
-                'file_size': 3407202
+                'duration': 10,
+                'file_name': '898a08080d1840793122b7e118b27a95d117ebce_cut10_e.mp3',
+                'file_size': 160958
             }
         }
 
@@ -66,8 +66,7 @@ class MediaServer(resource.Resource):
         print("\nLoading media...")
         for _, c in CATALOG.items():
             print(c['file_name'])
-            self.MEDIA[c['file_name']] = open(os.path.join(CATALOG_BASE, c['file_name']), 'rb').read()
-            # self.getFile(os.path.join(CATALOG_BASE, c['file_name'])).encode('latin')
+            self.MEDIA[c['file_name']] = self.getFile(os.path.join(CATALOG_BASE, c['file_name'])).encode('latin')
 
         # Load private key
         fp = open(FILEPRIVATEKEY, 'rb')
@@ -178,7 +177,7 @@ class MediaServer(resource.Resource):
                 request = request,
                 response = {'error': 'The client certificate is not valid!'}
             )
-            
+
         # Validate session and log in
         invalid, session = self.invalidSession(request)
         if invalid: return invalid
