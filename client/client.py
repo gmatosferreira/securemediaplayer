@@ -499,7 +499,7 @@ class MediaClient:
             # print("\nGot MIC (hash)...\n", request.headers['Mic'])
             # MIC = str(request.content.strip()).__hash__()
         # Validate certificate and signature
-        cert = request.headers['Certificate'].replace(" ", "\n").replace("\n", " ", 1)[::-1].replace("\n", " ", 1)[::-1]+"\n"
+        cert = base64.b64decode(request.headers['Certificate']).decode('latin')
         if not self.pki.validateCerts(cert, [], pem=True):
             print("ERROR! The server certificate is not valid!")
             return None
