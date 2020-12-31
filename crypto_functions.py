@@ -227,10 +227,10 @@ class CryptoFunctions:
                     mgf=padding.MGF1(hashes.SHA256()), 
                     salt_length=padding.PSS.MAX_LENGTH
                 ),
-                hashes.SHA256(),
+                hashes.SHA256()
             )
         except:
-            return False
+            return TypeError
 
         return True
     

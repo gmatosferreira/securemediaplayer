@@ -1,6 +1,6 @@
 from cryptography import x509
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
-
+import base64
 from crypto_functions import *
 
 
@@ -27,10 +27,10 @@ def load_cert_key(file):
     
     try:
         with open(file, "rb") as f:
-            key = load_pem_private_key(f.read(), password="key".encode('utf-8'))
+            key = load_pem_private_key(f.read(), password=None)
         return key
     except:
-        raise TypeError
+        raise False
 
 """
     Method used to load certificate key from file 
@@ -38,11 +38,11 @@ def load_cert_key(file):
 """
 def load_all_certs():
         #load server cert
-        client_cert = load_cert("certificates/client_localhost.pem")
+        client_cert = load_cert("certificates/client_localhost.crt")
         print(client_cert)
         print(client_cert.issuer)
         print(client_cert.subject)
-        server_cert = load_cert("certificates/server_localhost.pem")
+        server_cert = load_cert("certificates/server_localhost.crt")
         print(server_cert)
         print(server_cert.issuer)
         print(server_cert.subject)
@@ -51,9 +51,9 @@ def load_all_certs():
         print(ca_cert.issuer)
         print(ca_cert.subject)
         
-        client_private_key = load_cert_key("keys/client_localhost.pk8")
+        client_private_key = load_cert_key("keys/client_localhost.pem")
         print(client_private_key)
-        server_privateKey = load_cert_key("keys/server_localhost.pk8")
+        server_privateKey = load_cert_key("keys/server_localhost.pem")
         print(server_privateKey)
 
         print("\n\n\nSigning test...")
@@ -62,9 +62,10 @@ def load_all_certs():
         sign = CryptoFunctions.signingRSA(message, server_privateKey)
         print("\nGenerated signature...\n", sign)
         print("\nGoing to validate signature...")
+
         print(CryptoFunctions.validacaoAssinatura_RSA(
             signature=sign,
-            message=b"asdsfgh",
+            message= message,
             public_key=server_cert.public_key()
         ))
 
