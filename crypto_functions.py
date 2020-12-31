@@ -199,7 +199,7 @@ class CryptoFunctions:
                 hashes.SHA256()
             )
         except:
-            return TypeError
+            return False
 
         return True
     

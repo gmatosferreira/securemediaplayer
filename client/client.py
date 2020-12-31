@@ -324,8 +324,6 @@ class MediaClient:
                 if media:
                     break
 
-            # TODO: Process chunk
-
             if not media or 'error' in media:
                 print("\nGot empty or invalid chunk!!")
                 self.downloadErrors += 1
@@ -519,7 +517,16 @@ class MediaClient:
             return None
         else:
             print("\nThe server certificate is valid!")
-        # TODO Validate signature!
+        
+        # Validate signature!
+        cert = self.pki.getCertFromString(cert, pem=True) 
+        sign = base64.b64decode(request.headers['Signature']) 
+        print("\nGot signature...\n", sign) 
+        if not CryptoFunctions.validacaoAssinatura_RSA(sign, request.content, cert.public_key()): 
+            print("\nERROR! The server signature is not valid!") 
+            return None 
+        else: 
+            print("\nThe server signature is valid! :)") 
 
         # Check if response is ciphered
         if not ciphered:
