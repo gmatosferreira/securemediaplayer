@@ -1,6 +1,8 @@
 from cryptography import x509
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
+from crypto_functions import *
+
 
 """
     Method used to load certificate from file 
@@ -49,10 +51,23 @@ def load_all_certs():
         print(ca_cert.issuer)
         print(ca_cert.subject)
         
-        rsa_private_key = load_cert_key("keys/client_localhost.pk8")
-        print(rsa_private_key)
-        rsa_privateKey = load_cert_key("keys/server_localhost.pk8")
-        print(rsa_privateKey)
+        client_private_key = load_cert_key("keys/client_localhost.pk8")
+        print(client_private_key)
+        server_privateKey = load_cert_key("keys/server_localhost.pk8")
+        print(server_privateKey)
+
+        print("\n\n\nSigning test...")
+        message = b"asdsfgh"
+        print(f"\nGoing to sign {message} with server private key")
+        sign = CryptoFunctions.signingRSA(message, server_privateKey)
+        print("\nGenerated signature...\n", sign)
+        print("\nGoing to validate signature...")
+        print(CryptoFunctions.validacaoAssinatura_RSA(
+            signature=sign,
+            message=b"asdsfgh",
+            public_key=server_cert.public_key()
+        ))
+
 
 
 
