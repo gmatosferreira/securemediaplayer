@@ -8,6 +8,7 @@ import os
 import math
 import uuid
 import base64
+import datetime
 from aux_functions import *
 
 # Serialization
@@ -43,6 +44,7 @@ CATALOG_BASE = 'catalog'
 CHUNK_SIZE = 1024 * 4  #block
 FILEPRIVATEKEY = '../keys/server_localhost.pem'
 FILECERTIFICATE = '../certificates/server_localhost.crt'
+SESSIONEXPIRES = datetime.timedelta(hours=2)
 
 # Load server key
 with open('key.txt') as f:
@@ -286,7 +288,8 @@ class MediaServer(resource.Resource):
             'digest': DIGEST,
             'mode': CIPHER_MODE,
             'authenticated': False,
-            'data': None 
+            'data': None ,
+            'created': datetime.datetime.now()
         }
 
         # 7. Return public key to client
@@ -774,13 +777,19 @@ class MediaServer(resource.Resource):
     def getSession(self, request):
         """
         This method gets the session for the token sent on request header
+        Only returns is session is not expired yet!
         """
+        # Get session given the id
         headers = request.getAllHeaders()
         sessionid = uuid.UUID(bytes=base64.b64decode(headers[b'sessionid']))
         if sessionid not in self.sessions.keys():
             print(f"\nInvalid session! ({sessionid})")
             return None
         session = self.sessions[sessionid]
+        # If session exists, check if has already expired
+        if session['created']+SESSIONEXPIRES < datetime.datetime.now():
+            print(f"\nSession has expired! ({sessionid})")
+            return None
         print("\nSession", sessionid)
         print(session)
         return session
