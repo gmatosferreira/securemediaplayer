@@ -712,7 +712,7 @@ class MediaServer(resource.Resource):
         
         # Get MIC and validate it
         
-        RMIC = headers[b'mic']
+        RMIC = base64.b64decode(headers[b'mic'])
         print("\nGot MIC...\n", RMIC)
         MIC = CryptoFunctions.create_digest(request.content.getvalue().strip(), session['digest']).strip()
         print("\nMIC computed...\n", MIC)
@@ -722,7 +722,7 @@ class MediaServer(resource.Resource):
         else:
             print("Validated MIC!")
 
-        RMAC = headers[b'mac']
+        RMAC = base64.b64decode(headers[b'mac'])
         print("\nGot MAC...\n", RMIC)
         MAC = CryptoFunctions.create_digest(request.content.getvalue().strip() + session['shared_key'], session['digest']).strip()
         print("\nMAC computed...\n", MAC)
@@ -750,8 +750,7 @@ class MediaServer(resource.Resource):
         This method gets the session for the token sent on request header
         """
         headers = request.getAllHeaders()
-        print("Sessionid", headers[b'sessionid'], type(headers[b'sessionid']))
-        sessionid = uuid.UUID(bytes=headers[b'sessionid'])
+        sessionid = uuid.UUID(bytes=base64.b64decode(headers[b'sessionid']))
         if sessionid not in self.sessions.keys():
             print(f"\nInvalid session! ({sessionid})")
             return None

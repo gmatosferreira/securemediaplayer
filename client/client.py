@@ -262,7 +262,7 @@ class MediaClient:
         """
         # 1. Get a list of media files
         print("Contacting Server...")
-        req = requests.get(f'{SERVER_URL}/api/list', headers = {'sessionid': self.sessionid.bytes})
+        req = requests.get(f'{SERVER_URL}/api/list', headers = {'sessionid': base64.b64encode(self.sessionid.bytes)})
         reqResp = self.processResponse(req)
         if req.status_code != 200:
             self.responseError(req, reqResp)
@@ -309,7 +309,7 @@ class MediaClient:
 
             # Make request until gets a valid answer (max 5 times)
             for i in range(0,5):
-                req = requests.get(f'{SERVER_URL}/api/download?id={media_item["id"]}&chunk={chunk}', headers = {'sessionid': self.sessionid.bytes})
+                req = requests.get(f'{SERVER_URL}/api/download?id={media_item["id"]}&chunk={chunk}', headers = {'sessionid': base64.b64encode(self.sessionid.bytes)})
                 media = self.processResponse(req, bytes(chunk))
 
                 if req.status_code != 200:
@@ -350,7 +350,7 @@ class MediaClient:
         """
         This method allows the client to look up his license status
         """
-        req = requests.get(f'{SERVER_URL}/api/license', headers = {'sessionid': self.sessionid.bytes})
+        req = requests.get(f'{SERVER_URL}/api/license', headers = {'sessionid': base64.b64encode(self.sessionid.bytes)})
         reqResp = self.processResponse(req)
         if req.status_code != 200:
             self.responseError(req, reqResp)
@@ -446,11 +446,11 @@ class MediaClient:
         print("\nGenerated SIGN:\n", SIGN)
 
         headers = {
-            'mic': MIC, 
-            'mac': MAC, 
+            'mic': base64.b64encode(MIC), 
+            'mac': base64.b64encode(MAC), 
             'signature': base64.b64encode(SIGN), 
             'cert': base64.b64encode(self.cert.public_bytes(encoding = serialization.Encoding.PEM)), 
-            'sessionid': self.sessionid.bytes
+            'sessionid': base64.b64encode(self.sessionid.bytes)
         }
 
         return cryptogram, headers
