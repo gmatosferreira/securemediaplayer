@@ -3,6 +3,7 @@ import logging
 import binascii
 import json
 import os
+import signal
 import subprocess
 import time
 import base64
@@ -33,6 +34,7 @@ logger.setLevel(logging.INFO)
 SERVER_URL = 'http://127.0.0.1:8080'
 FILEPRIVATEKEY = '../keys/client_localhost.pk8'
 FILECERTIFICATE = '../certificates/client_localhost.pem'
+MAXDOWNLOADERRORS = 20
 
 class MediaClient:
 
@@ -99,6 +101,7 @@ class MediaClient:
         self.DIGEST = None
         self.CIPHERMODE = None
         self.logged = False
+        self.downloadErrors = 0
 
     
     def start(self):
@@ -323,6 +326,12 @@ class MediaClient:
 
             if not media or 'error' in media:
                 print("\nGot empty or invalid chunk!!")
+                self.downloadErrors += 1
+                if self.downloadErrors > MAXDOWNLOADERRORS:
+                    print("\nReached max download errors, aborting media play...")
+                    # Kill reproducer window
+                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                    break
                 continue
 
             data = binascii.a2b_base64(media['data'].encode('latin'))
@@ -524,7 +533,10 @@ class MediaClient:
                 encode = False 
             ) 
         # Convert message bytes to str and to Python Object
-        return json.loads(message.decode()) 
+        try:
+            return json.loads(message.decode()) 
+        except:
+            return None
 
     def responseError(self, request, data):
         """

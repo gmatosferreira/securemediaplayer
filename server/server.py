@@ -216,8 +216,6 @@ class MediaServer(resource.Resource):
                 valid_chunk = True
                 #if is valid chunck update_license
                 media_duration= media_item['duration']
-                
-                update_license(self.username,media_duration)
         except:
             logger.warn("Chunk format is invalid")
 
