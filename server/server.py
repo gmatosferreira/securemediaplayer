@@ -689,6 +689,15 @@ class MediaServer(resource.Resource):
         else:
             print("\nThe server certificate is valid!")
 
+        # Validate signature!
+        cert = self.pki.getCertFromString(cert, pem=True) 
+        sign = base64.b64decode(headers[b'signature']) 
+        if not CryptoFunctions.validacaoAssinatura_RSA(sign, request.content.getvalue(), cert.public_key()):
+            print("\nERROR! The client signature is not valid!")
+            return None, None
+        else: 
+            print("\nThe client signature is valid! :)") 
+
         # Get session and validate it
         session = self.getSession(request)
         if not session:

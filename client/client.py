@@ -453,6 +453,7 @@ class MediaClient:
         
         SIGN = CryptoFunctions.signingRSA(cryptogram, self.cert_private_key)
         print("\nGenerated SIGN:\n", SIGN)
+        print("\nContent signed:\n", cryptogram)
 
         headers = {
             'mic': base64.b64encode(MIC), 
