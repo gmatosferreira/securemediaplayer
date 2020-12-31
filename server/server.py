@@ -159,114 +159,6 @@ class MediaServer(resource.Resource):
             sessioninfo = session
         )
 
-
-    # Send a media chunk to the client
-    def do_download(self, request):
-
-        # Validate session and log in
-        invalid, session = self.invalidSession(request)
-        if invalid: return invalid
-
-        # Validate license
-        if not licenseValid(self, session['username']):
-            return self.cipherResponse(
-                request = request,
-                response = {'error': 'License is not valid! Please renew it.'},
-                sessioninfo = session,
-                error = True
-            )
-
-        logger.debug(f'Download: args: {request.args}')
-        
-        media_id = request.args.get(b'id', [None])[0]
-        logger.debug(f'Download: id: {media_id}')
-
-        # Check if the media_id is not None as it is required
-        if media_id is None:
-            return self.cipherResponse(
-                request = request, 
-                response = {'error': 'invalid media id'}, 
-                sessioninfo = session,
-                append = bytes(chunk_id),
-                error = True
-            )
-        
-        # Convert bytes to str
-        media_id = media_id.decode('latin')
-
-        # Search media_id in the catalog
-        if media_id not in CATALOG:
-            return self.cipherResponse(
-                request = request, 
-                response = {'error': 'media file not found'}, 
-                sessioninfo = session,
-                append = bytes(chunk_id),
-                error = True
-            )
-        
-        # Get the media item
-        media_item = CATALOG[media_id]
-
-        # Check if a chunk is valid
-        chunk_id = request.args.get(b'chunk', [b'0'])[0]
-        valid_chunk = False
-        try:
-            chunk_id = int(chunk_id.decode('latin'))
-            if chunk_id >= 0 and chunk_id  < math.ceil(media_item['file_size'] / CHUNK_SIZE):
-                valid_chunk = True
-                #if is valid chunck update_license
-                media_duration= media_item['duration']
-        except:
-            logger.warn("Chunk format is invalid")
-
-        # Update license for first chunk (decrement views)
-        if chunk_id==0:
-            user = updateLicense(self, session['username'], view=True)
-            if not user:
-                return self.cipherResponse(
-                    request = request,
-                    response = {'error': 'There was an error updating the license. Try again!'},
-                    sessioninfo = session,
-                    error = True
-                )
-
-        if not valid_chunk:
-            return self.cipherResponse(
-                request = request, 
-                response = {'error': 'invalid chunk id'}, 
-                sessioninfo = session,
-                append = bytes(chunk_id),
-                error = True
-            )
-            
-            
-        logger.debug(f'Download: chunk: {chunk_id}')
-
-        offset = chunk_id * CHUNK_SIZE
-
-        # Open file, seek to correct position and return the chunk
-        data = self.MEDIA[media_item['file_name']][offset:offset+CHUNK_SIZE]
-        message = {
-            'media_id': media_id, 
-            'chunk': chunk_id, 
-            'data': binascii.b2a_base64(data).decode('latin').strip()
-        }
-        return self.cipherResponse(
-            request = request, 
-            response = message, 
-            sessioninfo = session,
-            append = bytes(chunk_id)
-        )
-
-        # File was not open?
-        return self.cipherResponse(
-            request = request, 
-            response = {'error': 'unknown'}, 
-            sessioninfo = session,
-            append = bytes(chunk_id),
-            error = True
-        )
-
     def do_license(self, request):
         """
         This method allows the client to look up his license status
@@ -286,8 +178,6 @@ class MediaServer(resource.Resource):
             sessioninfo = session
         )
 
-
-
     # Handle a GET request
     def render_GET(self, request):
         logger.debug(f'\nReceived request for {request.uri}')
@@ -302,14 +192,8 @@ class MediaServer(resource.Resource):
             #elif request.uri == 'api/auth':
             elif request.path == b'/api/list':
                 return self.do_list(request)
-            elif request.path == b'/api/download':
-                return self.do_download(request)
             elif request.path == b'/api/license':
                 return self.do_license(request)
-                
-       
-            
-
             else:
                 request.responseHeaders.addRawHeader(b"content-type", b'text/plain')
                 return b'Methods: /api/protocols /api/list /api/download'
@@ -571,6 +455,111 @@ class MediaServer(resource.Resource):
             sessioninfo = session,
         )
 
+    # Send a media chunk to the client
+    def do_download(self, request):
+
+        # Validate session and log in
+        invalid, session = self.invalidSession(request)
+        if invalid: return invalid
+
+        # Get payload
+        session, data = self.processRequest(request)
+        if not data or not all(attr in data for attr in ['media', 'chunk']):
+            return self.cipherResponse(
+                request = request,
+                response = {
+                    'error': 'Invalid payload! Try again!'
+                },
+                sessioninfo = session,
+                error=True,
+            )
+
+        logger.debug(f'Download: args: {request.args}')
+        
+        media_id = data['media']
+        logger.debug(f'Download: id: {media_id}')
+
+        # Check if the media_id is not None as it is required
+        if media_id is None:
+            return self.cipherResponse(
+                request = request, 
+                response = {'error': 'invalid media id'}, 
+                sessioninfo = session,
+                append = bytes(chunk_id),
+                error = True
+            )
+        
+        # Search media_id in the catalog
+        if media_id not in CATALOG:
+            return self.cipherResponse(
+                request = request, 
+                response = {'error': 'media file not found'}, 
+                sessioninfo = session,
+                append = bytes(chunk_id),
+                error = True
+            )
+        
+        # Get the media item
+        media_item = CATALOG[media_id]
+
+        # Check if a chunk is valid
+        chunk_id = data['chunk']
+        valid_chunk = False
+        try:
+            if chunk_id >= 0 and chunk_id  < math.ceil(media_item['file_size'] / CHUNK_SIZE):
+                valid_chunk = True
+                #if is valid chunck update_license
+                media_duration= media_item['duration']
+        except:
+            logger.warn("Chunk format is invalid")
+
+        # Update license for first chunk (decrement views)
+        if chunk_id==0:
+            user = updateLicense(self, session['username'], view=True)
+            if not user:
+                return self.cipherResponse(
+                    request = request,
+                    response = {'error': 'There was an error updating the license. Try again!'},
+                    sessioninfo = session,
+                    error = True
+                )
+
+        if not valid_chunk:
+            return self.cipherResponse(
+                request = request, 
+                response = {'error': 'invalid chunk id'}, 
+                sessioninfo = session,
+                append = bytes(chunk_id),
+                error = True
+            )
+            
+            
+        logger.debug(f'Download: chunk: {chunk_id}')
+
+        offset = chunk_id * CHUNK_SIZE
+
+        # Open file, seek to correct position and return the chunk
+        data = self.MEDIA[media_item['file_name']][offset:offset+CHUNK_SIZE]
+        message = {
+            'media_id': media_id, 
+            'chunk': chunk_id, 
+            'data': binascii.b2a_base64(data).decode('latin').strip()
+        }
+        return self.cipherResponse(
+            request = request, 
+            response = message, 
+            sessioninfo = session,
+            append = bytes(chunk_id)
+        )
+
+        # File was not open?
+        return self.cipherResponse(
+            request = request, 
+            response = {'error': 'unknown'}, 
+            sessioninfo = session,
+            append = bytes(chunk_id),
+            error = True
+        )
 
 
     # Handle a POST request
@@ -587,6 +576,8 @@ class MediaServer(resource.Resource):
                 return self.do_session_end(request)
             elif request.path == b'/api/renew':
                 return self.do_renew_license(request)
+            elif request.path == b'/api/download':
+                return self.do_download(request)
         
         except Exception as e:
             logger.exception(e)

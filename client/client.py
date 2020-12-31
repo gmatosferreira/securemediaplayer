@@ -312,7 +312,9 @@ class MediaClient:
 
             # Make request until gets a valid answer (max 5 times)
             for i in range(0,5):
-                req = requests.get(f'{SERVER_URL}/api/download?id={media_item["id"]}&chunk={chunk}', headers = {'sessionid': base64.b64encode(self.sessionid.bytes)})
+                data, headers  = self.cipher({"media": media_item["id"], "chunk": chunk})
+                # POST to server
+                req = requests.post(f'{self.SERVER_URL}/api/download', data = data, headers = headers)
                 media = self.processResponse(req, bytes(chunk))
 
                 if req.status_code != 200:
