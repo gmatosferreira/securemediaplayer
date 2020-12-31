@@ -16,6 +16,7 @@ class CryptoFunctions:
         '3DES / CBC / BLAKE2',
         '3DES / OFB / BLAKE2',
     ]
+    digests = ['SHA512', 'BLAKE2']
 
     """
     This method handles the creation of private/public keys pair
