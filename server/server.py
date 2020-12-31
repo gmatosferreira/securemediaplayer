@@ -41,8 +41,8 @@ CATALOG = { '898a08080d1840793122b7e118b27a95d117ebce':
 
 CATALOG_BASE = 'catalog'
 CHUNK_SIZE = 1024 * 4  #block
-FILEPRIVATEKEY = '../keys/server_localhost.pk8'
-FILECERTIFICATE = '../certificates/server_localhost.pem'
+FILEPRIVATEKEY = '../keys/server_localhost.pem'
+FILECERTIFICATE = '../certificates/server_localhost.crt'
 
 # Load server key
 with open('key.txt') as f:
@@ -73,7 +73,7 @@ class MediaServer(resource.Resource):
         fp = open(FILEPRIVATEKEY, 'rb')
         self.private_key = serialization.load_pem_private_key(
             fp.read(),
-            password = 'key'.encode('utf-8')
+            password = None
         )
         fp.close()
         print("\nLoaded private key...\n", self.private_key)

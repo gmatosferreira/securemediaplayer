@@ -32,8 +32,8 @@ logging.basicConfig(format=FORMAT)
 logger.setLevel(logging.INFO)
 
 SERVER_URL = 'http://127.0.0.1:8080'
-FILEPRIVATEKEY = '../keys/client_localhost.pk8'
-FILECERTIFICATE = '../certificates/client_localhost.pem'
+FILEPRIVATEKEY = '../keys/client_localhost.pem'
+FILECERTIFICATE = '../certificates/client_localhost.crt'
 MAXDOWNLOADERRORS = 20
 
 class MediaClient:
@@ -54,7 +54,7 @@ class MediaClient:
         fp = open(FILEPRIVATEKEY, 'rb')
         self.cert_private_key = serialization.load_pem_private_key(
             fp.read(),
-            password = 'key'.encode('utf-8')
+            password = None
         )
         fp.close()
         print("\nLoaded certificate private key...\n", self.cert_private_key)
