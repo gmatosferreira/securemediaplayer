@@ -10,8 +10,6 @@ class CitizenCard:
         """
         This class handles cryptography with portuguese citizen card
         """
-        print("\nCITIZEN CARD")
-
         # 1. Find the slot for smart card
         pkcs11 = PyKCS11.PyKCS11Lib()
         pkcs11.load('/usr/local/lib/libpteidpkcs11.so')
@@ -29,7 +27,6 @@ class CitizenCard:
             (PyKCS11.CKA_CLASS, PyKCS11.CKO_PRIVATE_KEY),
             (PyKCS11.CKA_LABEL, 'CITIZEN AUTHENTICATION KEY'),
         ])[0]
-        print("Loaded private key...")
 
         # 2.2. Get certificate
         self.cert = None
@@ -45,18 +42,14 @@ class CitizenCard:
             if attr['CKA_CLASS']==1:
                 if attr['CKA_LABEL'] == 'CITIZEN AUTHENTICATION CERTIFICATE':
                     self.cert = x509.load_der_x509_certificate(bytes(attr['CKA_VALUE']))
-                    print("Loaded cert!", self.cert)
                 else:
                     c = x509.load_der_x509_certificate(bytes(attr['CKA_VALUE']))
                     self.intermedium.append(c)
-                    print("Loaded interdium...", c)
-        print("Loaded all certificates...")
 
         # 2.3. Validate
         if not self.private_key or not self.cert:
             print("\nERROR! Could not load keys...")
             exit()
-        print()
 
     def sign(self, message):
         """

@@ -28,16 +28,12 @@ def register(server, username, password, signature, signcert, intermedium):
     userData        dict()          The object with user info at licenses.json
     errorMessage    String          A message describing the error
     """
-    print("\nREGISTER")
     if not username or not password: return None, "There are attributes missing!"
 
     # Validate certificate
-    print("\nVALIDATING SIGNATURE CERTIFICATE...")
     if not server.pki.validateCerts(signcert, intermedium):
         print("ERROR! The signature certificate is not valid!")
         return None, "The signature certificate is not valid!"
-    else:
-        print("It is valid! :)")
 
     certificate = PKI.getCertFromString(signcert, pem=False)
 
@@ -47,8 +43,8 @@ def register(server, username, password, signature, signcert, intermedium):
         message = (username+password).encode('latin'),
         sign = signature.encode('latin')
     )
-    print("\nValidating signature...", valid)
     if not valid:
+        print("ERROR! The signature is not valid!")
         return None, "The signature is not valid!"
 
     # Load users
@@ -57,7 +53,6 @@ def register(server, username, password, signature, signcert, intermedium):
         users = []
     else:
         users = json.loads(usersfile)
-        print("Got users", [u['username'] for u in users])
 
     # Check that user is not registered yet
     for u in users:
@@ -77,8 +72,6 @@ def register(server, username, password, signature, signcert, intermedium):
     # Create digests for password
     for digest in CryptoFunctions.digests:
         user['passwords'][digest] = CryptoFunctions.create_digest(password.encode('latin'), digest).decode('latin')
-
-    print("Created user\n", user)
 
     # Add user to users list
     users.append(user)
@@ -137,7 +130,6 @@ def updateLicense(server, username, renew = False, view = False):
     --- Returns 
     userData        The object with user info at licenses.json
     """
-    print("\nRENEW LICENSE")
     if not username: return None
 
     # Load users
@@ -184,7 +176,6 @@ def authenticate(server, username, password, signature, sessionData):
     userData        The object with user info at licenses.json
     error           The error message
     """
-    print("\nAUTHENTICATE")
     # Load users
     usersfile = server.getFile('./licenses.json')
     if not usersfile:
@@ -195,8 +186,6 @@ def authenticate(server, username, password, signature, sessionData):
     # Find user object
     for u in users:
         if u['username'] == username:
-            print("Found user!")
-
             # Validate signature with user stored certificate 
             cert = x509.load_der_x509_certificate(u['cert'].encode('latin'))
             valid = CitizenCard.validateSignature(
@@ -204,16 +193,11 @@ def authenticate(server, username, password, signature, sessionData):
                 message = (username+password).encode('latin'),
                 sign = signature.encode('latin')
             )
-            print("\nValidating signature...", valid)
             if not valid:
                 return None, "The signature is not valid!"
                 
-            # Check password
-            print("Expected password is", u['passwords'][sessionData['digest']].encode('latin'), f"({len(u['passwords'][sessionData['digest']].encode('latin'))})")
-            print("Got", password.encode('latin'), f"({len(password.encode('latin'))})")
-            
+            # Check password            
             if u['passwords'][sessionData['digest']] == password:
-                print("Password is valid! :)")
                 return u, ""
             else:
                 print("Password is not valid! :/")

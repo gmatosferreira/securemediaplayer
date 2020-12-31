@@ -49,7 +49,6 @@ SESSIONEXPIRES = datetime.timedelta(hours=2)
 # Load server key
 with open('key.txt') as f:
     KEY = f.read().strip()
-print("\nWorking with key:", KEY)
 
 class MediaServer(resource.Resource):
     isLeaf = True
@@ -61,13 +60,11 @@ class MediaServer(resource.Resource):
         # Load parameters
         with open('parameters', 'rb') as f:
             self.parameters = serialization.load_pem_parameters(f.read().strip())    
-            print("Loaded parameters!")
 
         # Load media files
         self.MEDIA = dict()
         print("\nLoading media...")
         for _, c in CATALOG.items():
-            print(c['file_name'])
             self.MEDIA[c['file_name']] = self.getFile(os.path.join(CATALOG_BASE, c['file_name'])).encode('latin')
 
         # Load private key
@@ -77,13 +74,11 @@ class MediaServer(resource.Resource):
             password = None
         )
         fp.close()
-        print("\nLoaded private key...\n", self.private_key)
 
         # Load certificate
         fc = open(FILECERTIFICATE, "rb")
         self.cert = PKI.getCertFromString(fc.read(), pem=True)
         fc.close()
-        print("\nLoaded certificate...\n", self.cert)
 
         # Initialize session dictionary
         self.sessions = {}
@@ -106,7 +101,6 @@ class MediaServer(resource.Resource):
             encoding = serialization.Encoding.PEM,
             format = serialization.ParameterFormat.PKCS3
         )
-        print("\nSerialized parameters as bytes to answer request!\n", pr)
         # Return it
         return self.rawResponse(
             request = request,
@@ -232,52 +226,30 @@ class MediaServer(resource.Resource):
     def do_session(self, request):
         data = request.args
         if data == None or data == '':
-            print('Data is none or empty')
             return 
-        print(request.args) 
 
         # 1.1. Get the client public key
-        print("\nClient public key raw.\n", request.args[b'public_key'][0])
         client_public_key = serialization.load_pem_public_key(request.args[b'public_key'][0])
-        print("\nGot the client public key!\n", client_public_key)
 
         # 1.2. Get the client cipher suite
         CIPHER = request.args[b'cipher'][0].decode('utf-8')
         DIGEST = request.args[b'digest'][0].decode('utf-8')
         CIPHER_MODE = request.args[b'cipher_mode'][0].decode('utf-8')
-        print("\nGot client cipher suite!")
-        print("Cipher:", CIPHER)
-        print("Digest:", DIGEST)
-        print("Mode:", CIPHER_MODE)
 
         # 2. Generate a session id for client
         sessionid = uuid.uuid1()
-        print("\nGenerated session id for client:", sessionid)
 
         # 3. Generate key pair for client
         private_key, public_key = CryptoFunctions.newKeys(self.parameters)
-        print("\nPrivate key created!\n", private_key)
-        print(private_key.private_bytes(
-            encoding = serialization.Encoding.PEM,
-            format = serialization.PrivateFormat.PKCS8,
-            encryption_algorithm = serialization.NoEncryption()
-        ))
-        print("\nPublic key generated!\n", public_key)
-        print(public_key.public_bytes(
-            encoding = serialization.Encoding.PEM,
-            format = serialization.PublicFormat.SubjectPublicKeyInfo
-        ))
 
         # 4. Diffie-Hellman | Generate shared key
         shared_key = private_key.exchange(client_public_key)
-        print("\nGenerated the shared key for client!\n", shared_key)
 
         # 5. Convert public key to bytes
         pk = public_key.public_bytes(
             encoding = serialization.Encoding.PEM,
             format = serialization.PublicFormat.SubjectPublicKeyInfo
         )
-        print("\nSerialized public key to answer request!\n", pk)
 
         # 6. Register client session
         self.sessions[sessionid] = {
@@ -305,12 +277,6 @@ class MediaServer(resource.Resource):
     To authenticate, the client must have started a session!
     """
     def do_auth(self, request, registration = False):
-        # Get data from request header
-        if not registration:
-            print("\n\nAUTHENTICATION")
-        else:
-            print("\n\nREGISTRATION")
-
         # Process request 
         # (Get session and decipher payload)
         session, data = self.processRequest(request)
@@ -325,7 +291,6 @@ class MediaServer(resource.Resource):
 
         # If logout, log user out, 
         if 'logout' in data and data['logout']:
-            print("\nLOG OUT")
             session['authenticated'] = False
             return self.cipherResponse(
                 request = request, 
@@ -357,7 +322,6 @@ class MediaServer(resource.Resource):
                 sessioninfo = session,
             )
             
-        print("\nData received is...\n", data)
         # Validate data
         if not registration:
             userData, error = authenticate(self, data['username'], data['password'], data['signature'], session)
@@ -390,14 +354,10 @@ class MediaServer(resource.Resource):
         """
         This method allows client to end his session
         """
-        print("\n\nEND SESSION")
         # Process request 
         # (Get session and decipher payload)
         session, data = self.processRequest(request)
         
-        print("Session:", session)
-        print("Open sessions are:", self.sessions.keys())
-
         # Validate that client has open session
         if not session:
             return self.rawResponse(
@@ -410,8 +370,6 @@ class MediaServer(resource.Resource):
         for id, s in self.sessions.items():
             if s == session:
                 self.sessions.pop(id)
-                print("Poped session!")
-                print("Open sessions are:", self.sessions.keys())
                 return self.cipherResponse(
                     request = request, 
                     response = {
@@ -617,11 +575,9 @@ class MediaServer(resource.Resource):
         --- Returns
         cryptogram      The response encrypted
         """
-        print("\nAnswering...", response)
         if not response or not sessioninfo: return None
         # Convert Python Object to str and then to bytes
         message = json.dumps(response).encode()
-        print("\nSerialized to...", message)
         # Encrypt
         cryptogram = CryptoFunctions.symetric_encryption(
             key = sessioninfo['shared_key'] if not append else sessioninfo['shared_key'] + append,
@@ -633,12 +589,9 @@ class MediaServer(resource.Resource):
         )
         # Generate MIC
         MIC = CryptoFunctions.create_digest(cryptogram, sessioninfo['digest'])
-        print("\nGenerated MIC:\n", MIC)
         MAC = CryptoFunctions.create_digest(cryptogram+sessioninfo['shared_key'], sessioninfo['digest'])
-        print("\nGenerated MAC:\n", MAC)
         # Sign request with private key
         SIGN = CryptoFunctions.signingRSA(cryptogram, self.private_key)
-        print("\nGenerated signature:\n", SIGN)
         # Add headers
         request.responseHeaders.addRawHeader(b"mic", base64.b64encode(MIC))
         request.responseHeaders.addRawHeader(b"mac", base64.b64encode(MAC))
@@ -662,18 +615,13 @@ class MediaServer(resource.Resource):
         --- Returns
         cryptogram      The response encrypted
         """
-        print("\nAnswering...", response)
         if not response: return None
         # Convert Python Object to str and then to bytes
         message = json.dumps(response).encode().strip()
-        print("\nSerialized to...", message)
-        print("\nType of serialized...", type(message))
         # Generate pseudo MIC
         MIC = str(str(message).__hash__()).encode('latin')
-        print("\nGenerated pseudo MIC:\n", MIC)
         # Sign request with private keya
         SIGN = CryptoFunctions.signingRSA(message, self.private_key)
-        print("\nGenerated signature:\n", SIGN)
         # Add headers
         request.responseHeaders.addRawHeader(b"mic", base64.b64encode(MIC))
         request.responseHeaders.addRawHeader(b"signature", base64.b64encode(SIGN))
@@ -697,8 +645,6 @@ class MediaServer(resource.Resource):
         session         Dict with session info
         data            The payload deciphered and validated
         """
-        print("\nProcessing request...")
-
         headers = request.getAllHeaders()
 
         # Validate certificate and request signature
@@ -712,27 +658,16 @@ class MediaServer(resource.Resource):
         
         # Get MIC and validate it
         RMIC = base64.b64decode(headers[b'mic'])
-        print("\nGot MIC...\n", RMIC)
         MIC = CryptoFunctions.create_digest(request.content.getvalue().strip(), session['digest']).strip()
-        print("\nMIC computed...\n", MIC)
         if MIC != RMIC:
-            print("INVALID MIC!")
             return None, None
-        else:
-            print("Validated MIC!")
 
         RMAC = base64.b64decode(headers[b'mac'])
-        print("\nGot MAC...\n", RMIC)
         MAC = CryptoFunctions.create_digest(request.content.getvalue().strip() + session['shared_key'], session['digest']).strip()
-        print("\nMAC computed...\n", MAC)
         if MAC != RMAC:
-            print("INVALID MAC!")
             return None, None
-        else:
-            print("Validated MAC!")
 
         # Decipher request
-        print("\nDeciphering request...\n", request.content.getvalue().strip())
         message = CryptoFunctions.symetric_encryption( 
             key = session['shared_key'], 
             message = request.content.getvalue(), 
@@ -753,15 +688,11 @@ class MediaServer(resource.Resource):
         headers = request.getAllHeaders()
 
         # Validate certificate
-        print("\nGot Certificate and Signature...")
         cert =  base64.b64decode(headers[b'cert']).decode('latin')
-        print("\nCert is...\n", cert)
         if not self.pki.validateCerts(cert, [], pem=True):
-            print("ERROR! The server certificate is not valid!")
+            print("ERROR! The client certificate is not valid!")
             return False
-        else:
-            print("\nThe server certificate is valid!")
-
+        
         # Validate signature!
         cert = self.pki.getCertFromString(cert, pem=True) 
         sign = base64.b64decode(headers[b'signature']) 
@@ -769,8 +700,6 @@ class MediaServer(resource.Resource):
         if not CryptoFunctions.validacaoAssinatura_RSA(sign, signMessage, cert.public_key()):
             print("\nERROR! The client signature is not valid!")
             return False
-        else: 
-            print("\nThe client signature is valid! :)") 
         return True        
 
     # Session management
@@ -783,15 +712,13 @@ class MediaServer(resource.Resource):
         headers = request.getAllHeaders()
         sessionid = uuid.UUID(bytes=base64.b64decode(headers[b'sessionid']))
         if sessionid not in self.sessions.keys():
-            print(f"\nInvalid session! ({sessionid})")
+            print(f"\nSession is not valid! ({sessionid})")
             return None
         session = self.sessions[sessionid]
         # If session exists, check if has already expired
         if session['created']+SESSIONEXPIRES < datetime.datetime.now():
             print(f"\nSession has expired! ({sessionid})")
             return None
-        print("\nSession", sessionid)
-        print(session)
         return session
 
     # Validate that client has open session
@@ -829,7 +756,6 @@ class MediaServer(resource.Resource):
         - Returns
         content         String      The file decripted
         """
-        print(f"\ngetFile({location})")
         # Load file
         content = open(location, 'rb').read()
         # Descript it
@@ -851,7 +777,6 @@ class MediaServer(resource.Resource):
         - Returns
         content         String      The file decripted
         """
-        print(f"\nupdateFile({location})")
         # Generate cryptogram
         cryptogram = CryptoFunctions.symetric_encryption(
             key = KEY.encode('latin'),

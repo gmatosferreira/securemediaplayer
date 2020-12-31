@@ -40,8 +40,3 @@ def client_chosen_options(suites):
     suite = suite.split(" / ")
     cipherSuite = {'cipher': suite[0], 'cipher_mode':suite[1], 'digest': suite[2]}
     return cipherSuite
-        
-"""
-def user_logout(self):
-    requests.post(f'{self.SERVER_URL}/api/update_license', data = {"username": self.username})
-"""

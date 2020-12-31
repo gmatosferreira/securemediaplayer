@@ -46,7 +46,7 @@ class CryptoFunctions:
         elif digst_algorithm == "BLAKE2":
             hash_algorithm = hashes.BLAKE2b(64)
         else:
-            print("Digest Algorithm name not founded! ")
+            raise Exception("Digest Algorithm name not found!")
         
         digest = hashes.Hash(hash_algorithm)
         digest.update(message)
@@ -87,10 +87,6 @@ class CryptoFunctions:
         else:
             raise Exception("Algorithm not found!")
 
-
-        print(f"# Going to work with {algorithm.name} algorithm")
-        print("# Block size will be", blockLength)
-
         # Generate initialization vector
         if encode and iv == None:
             iv = os.urandom(blockLength)
@@ -120,7 +116,6 @@ class CryptoFunctions:
             criptograma += iv
 
         # Iterate over blocks
-        print(f"# Starting from 0 to {len(message)+1} with jumps of {blockLength}")
         for i in range(0,len(message)+1,blockLength):
             data = message[i:i+blockLength] if i < len(message) else b''
             # If data has block size, just encrypt
@@ -133,21 +128,13 @@ class CryptoFunctions:
                     padding_length = blockLength - len(data)
                     padding = [padding_length] * (padding_length)
                     criptograma += cryptor.update(data + bytes(padding))
-        print()
     
         # Add finalization on both modes
         criptograma += cryptor.finalize()
-        print(f"Finished at index {i} to {i+blockLength-1}")
 
         # If decripting, remove padding
         if not encode:
-            print("Removing padding of ", criptograma[-1])
             criptograma = criptograma[:-1*criptograma[-1]]
-            
-        if encode:
-            print(f"Encripted to\n{criptograma}")
-        else:
-            print(f"Decripted to\n{criptograma}")
         
         return criptograma
 
@@ -168,7 +155,6 @@ class CryptoFunctions:
 
     @staticmethod
     def signingRSA(message, private_key):
-        print("\nSIGNING...", message)
         signature = private_key.sign(
             message,
             padding.PSS(
@@ -187,7 +173,6 @@ class CryptoFunctions:
         param: message          Bytes
         param: public_key       Public Key
         """
-        print("\nVALIDATING SIGNATURE OF...", message)
         try:
             public_key.verify(
                 signature,

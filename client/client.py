@@ -57,13 +57,11 @@ class MediaClient:
             password = None
         )
         fp.close()
-        print("\nLoaded certificate private key...\n", self.cert_private_key)
 
         # Load certificate
         fc = open(FILECERTIFICATE, "rb")
         self.cert = PKI.getCertFromString(fc.read(), pem=True)
         fc.close()
-        print("\nLoaded certificate...\n", self.cert)
 
         # 1. Get DH parameters from server
         _, headers = self.processRequest({}, cipher=False)
@@ -79,21 +77,9 @@ class MediaClient:
             print("Couldn't get parameters from server... :/")
             exit()
         self.parameters = serialization.load_pem_parameters(bytes(data['parameters'], 'utf-8'))   
-        print("\nGot parameters\n", self.parameters)
 
         # 2. Generate the client private and public keys
         self.private_key, self.public_key = CryptoFunctions.newKeys(self.parameters)
-        print("\nPrivate key created!\n", self.private_key)
-        print(self.private_key.private_bytes(
-            encoding = serialization.Encoding.PEM,
-            format = serialization.PrivateFormat.PKCS8,
-            encryption_algorithm = serialization.NoEncryption()
-        ))
-        print("\nPublic key generated!\n", self.public_key)
-        print(self.public_key.public_bytes(
-            encoding = serialization.Encoding.PEM,
-            format = serialization.PublicFormat.SubjectPublicKeyInfo
-        ))
         
         # Initialize other vars
         self.sessionid = None
@@ -123,7 +109,6 @@ class MediaClient:
         # 1.2. Let user choose the cipher suite to use
         cipherSuite = client_chosen_options(data)
         self.CIPHER, self.DIGEST, self.CIPHERMODE = cipherSuite['cipher'], cipherSuite['digest'], cipherSuite['cipher_mode']
-        print(f"\nCipher suite defined!\nCipher: {self.CIPHER}; DIGEST: {self.DIGEST}; CIPHERMODE: {self.CIPHERMODE}")
         
         # 2. Register client at server and negociate encription keys (Diffie-Hellman)
 
@@ -132,7 +117,6 @@ class MediaClient:
             encoding = serialization.Encoding.PEM,
             format = serialization.PublicFormat.SubjectPublicKeyInfo
         )
-        print("\nSerialized public key to send server!\n", pk)
         data = cipherSuite
         data['public_key'] = pk.decode('utf-8') 
         req = requests.post(f'{self.SERVER_URL}/api/session', data=data)
@@ -145,15 +129,12 @@ class MediaClient:
             exit()
         # 2.1.1. Get the session id
         self.sessionid = uuid.UUID(bytes=req.headers['sessionid'].encode('latin'))
-        print("\nGot session id...\n", self.sessionid)
         # 2.1.2. Get the server public key as an answer to the POST request
         server_public_key_bytes = bytes(reqdata['public_key'], 'utf-8')
         server_public_key = serialization.load_pem_public_key(server_public_key_bytes)
-        print("\nGot the server public key!\n", server_public_key)
 
         # 2.2. Generate the shared key based on the server public key
         self.shared_key = self.private_key.exchange(server_public_key)
-        print("\nGenerated the client shared key!\n", self.shared_key)
 
     def run(self):
         # 1. Validate that client has already been started
@@ -233,17 +214,14 @@ class MediaClient:
                 passwordDigest = CryptoFunctions.create_digest(password.encode('latin'), self.DIGEST).decode('latin')
             else:
                 passwordDigest = password
-            print("Password digest: ", passwordDigest)
             # Sign username+password
             signature = cc.sign((username+passwordDigest).encode('latin')).decode('latin')
-            print("\nSigned username+password:", signature)
             # Create payload
             payload = {"username": username, "password": passwordDigest, "signature": signature}
             # On registration, send signature certificate
             if registration:
                 payload['signcert'] = cc.cert.public_bytes(serialization.Encoding.DER).decode('latin')
                 payload['intermedium'] = [c.public_bytes(serialization.Encoding.DER).decode('latin') for c in cc.intermedium]
-                print("\nEncoded CC public key...\n", payload['signcert'])
             data, headers  = self.processRequest(payload)
             # POST to server
             req = requests.post(url, data = data, headers = headers)
@@ -251,14 +229,8 @@ class MediaClient:
             reqResp = self.processResponse(request = req)
             if req.status_code != 200:
                 self.responseError(req, reqResp)
-            elif not registration:
-                self.logged = True
-                print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
-                self.showLicense(reqResp)
-                break
             else:
                 print(f"\nSUCCESS: {reqResp['success'] if reqResp else ''}")
-                self.showLicense(reqResp)
                 break
 
     def play(self):
@@ -266,7 +238,6 @@ class MediaClient:
         This method is used to play the media content from the server
         """
         # 1. Get a list of media files
-        print("Contacting Server...")
         _, headers = self.processRequest({}, cipher=False)
         headers ['sessionid'] = base64.b64encode(self.sessionid.bytes)
         req = requests.get(f'{SERVER_URL}/api/list', headers = headers)
@@ -278,7 +249,6 @@ class MediaClient:
         media_list = reqResp
         if not media_list:
             return
-        print("Got media list", media_list)
         
         # 2. Present a simple selection menu    
         idx = 0
@@ -329,7 +299,6 @@ class MediaClient:
                     break
 
             if not media or 'error' in media:
-                print("\nGot empty or invalid chunk!!")
                 self.downloadErrors += 1
                 if self.downloadErrors > MAXDOWNLOADERRORS:
                     print("\nReached max download errors, aborting media play...")
@@ -458,13 +427,9 @@ class MediaClient:
 
         if cipher:
             MIC = CryptoFunctions.create_digest(cryptogram, self.DIGEST).strip()
-            print("Generated MIC:\n",MIC)
             MAC = CryptoFunctions.create_digest(cryptogram+self.shared_key, self.DIGEST).strip()
-            print("\nGenerated MAC:\n", MAC)
         
         SIGN = CryptoFunctions.signingRSA(cryptogram, self.cert_private_key)
-        print("\nGenerated SIGN:\n", SIGN)
-        print("\nContent signed:\n", cryptogram)
 
         headers = {
             'signature': base64.b64encode(SIGN),
@@ -492,17 +457,14 @@ class MediaClient:
         payload     The payload (Python obj) of the request deciphered (if the case) and validated (the MIC)
         """
         if not request.content: return None
-        print("\n# Deciphering request...\n", request.content.strip())
-        print("\nHeaders:\n", request.headers)
 
         # Check if response is ciphered
         if 'ciphered' not in request.headers.keys() or request.headers['ciphered'] == 'False':
-            print("\nIt is not ciphered!")
             if ciphered:
                 print("\nERROR! Response is not ciphered, but should be!")
                 return None
         elif not ciphered:
-            print("\nExpecting not ciphered response, but it is ciphered!")
+            print("\nERROR! Expecting not ciphered response, but it is ciphered!")
             return None
 
         # Validate MIC
@@ -511,41 +473,27 @@ class MediaClient:
             if MIC != base64.b64decode(request.headers['Mic']):
                 print("INVALID MIC!")
                 return None
-            else:
-                print("Validated MIC!")
             
             MAC = CryptoFunctions.create_digest(request.content.strip() + self.shared_key, self.DIGEST)
             if MAC != base64.b64decode(request.headers['Mac']):
                 print("INVALID MAC!")
                 return None
-            else:
-                print("Validated MAC!")
-        else:
-            print("\nIgnoring MIC for now...")
-            # print("\nGot MIC (hash)...\n", request.headers['Mic'])
-            # MIC = str(request.content.strip()).__hash__()
         
         # Validate certificate
         cert = base64.b64decode(request.headers['Certificate']).decode('latin')
         if not self.pki.validateCerts(cert, [], pem=True):
             print("\nERROR! The server certificate is not valid!")
             return None
-        else:
-            print("\nThe server certificate is valid!")
         
         # Validate signature!
         cert = self.pki.getCertFromString(cert, pem=True) 
         sign = base64.b64decode(request.headers['Signature']) 
-        print("\nGot signature...\n", sign) 
         if not CryptoFunctions.validacaoAssinatura_RSA(sign, request.content, cert.public_key()): 
             print("\nERROR! The server signature is not valid!") 
-            return None 
-        else: 
-            print("\nThe server signature is valid! :)") 
+            return None
 
         # Check if response is ciphered
         if not ciphered:
-            print("\nResponse is not ciphered!")
             message = request.content
         else:
             message = CryptoFunctions.symetric_encryption( 

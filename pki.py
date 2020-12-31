@@ -16,8 +16,6 @@ class PKI:
         """
         This class allows for the certification chain validation
         """
-        print("\nPKI")
-
         # Get all trustable certs
         self.trustedcerts = {}
         for folder, pem in PKI.TRUSTEDCERTS.items():
@@ -42,7 +40,6 @@ class PKI:
             cert = x509.load_pem_x509_certificate(certificate.encode('latin'))
         else:
             cert = x509.load_der_x509_certificate(certificate.encode('latin'))
-        print("\nGot cert\n", cert)
 
         # Load intermedium certs
         intermediumCerts = {}
@@ -52,7 +49,6 @@ class PKI:
             else:
                 pkic = x509.load_der_x509_certificate(c.encode('latin'))
             intermediumCerts[pkic.subject] = pkic
-        print("\nGot intermedium certs list...\n", intermediumCerts)
 
         return PKI.validateCertHierarchy(cert, intermediumCerts, self.trustedcerts)
 
@@ -61,7 +57,6 @@ class PKI:
         """
         This method allows to load a certificate from a file
         """
-        print("Loading cert from...", fileLocation)
         f = open(fileLocation, 'rb')
         data = f.read()
         if pem:
@@ -100,23 +95,17 @@ class PKI:
         """
         This method validates a certificate given a list of intermedium and trustable (system) certificates
         """
-        print(f"> Validating {cert.subject}")
         # Check that it has not expired
         if PKI.certRevoked(cert):
-            print(f"> Certificate has already expired!")
             return False
         # If issuer is trustable, it is valid
         if cert.issuer in trustable:
-            print(f"> It was issued by {cert.issuer}, a trustable issuer!")
             return True
         # If it was self signed and not trusted, return to avoid infinite loop
         if cert.issuer == cert.subject:
-            print(f"The certificate is self signed, but is not on trusted list!")
             return False
         # If it is intermedium, validate intermedium
         if cert.issuer in intermedium:
-            print(f"> It was issued by an intermedium issuer ({cert.issuer}), validating it...")
             return PKI.validateCertHierarchy(intermedium[cert.issuer], intermedium, trustable)
         # If not valid, return False
-        print(f"> The issuer ({cert.issuer}) is not registered as a intermedium or trustable issuer!")
         return False
