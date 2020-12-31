@@ -236,8 +236,7 @@ class MediaClient:
                 payload['signcert'] = cc.cert.public_bytes(serialization.Encoding.DER).decode('latin')
                 payload['intermedium'] = [c.public_bytes(serialization.Encoding.DER).decode('latin') for c in cc.intermedium]
                 print("\nEncoded CC public key...\n", payload['signcert'])
-            data, MIC, MAC, SIGN  = self.cipher(payload)
-            headers = {'mic': MIC, 'mac': MAC, 'signature': SIGN, 'cert': self.cert.public_bytes(encoding = serialization.Encoding.PEM), 'sessionid': self.sessionid.bytes}
+            data, headers  = self.cipher(payload)
             # POST to server
             req = requests.post(url, data = data, headers = headers)
             # Process server response
@@ -333,9 +332,9 @@ class MediaClient:
         """
         This method handles the client log out at server
         """
-        data, MIC, MAC, SIGN  = self.cipher({"logout": True})
+        data, headers  = self.cipher({"logout": True})
         # POST to server
-        req = requests.post(f'{self.SERVER_URL}/api/auth', data = data, headers = {'mic': MIC, 'mac': MAC, 'signature': SIGN, 'cert': self.cert.public_bytes(encoding = serialization.Encoding.PEM), 'sessionid': self.sessionid.bytes})
+        req = requests.post(f'{self.SERVER_URL}/api/auth', data = data, headers = headers)
         # Process server response
         reqResp = self.processResponse(request = req)
         if req.status_code != 200:
@@ -361,9 +360,9 @@ class MediaClient:
         """
         This method allows the client to renew his certificate with the server
         """
-        data, MIC, MAC, SIGN  = self.cipher({"renew": True})
+        data, headers  = self.cipher({"renew": True})
         # POST to server
-        req = requests.post(f'{self.SERVER_URL}/api/renew', data = data, headers = {'mic': MIC, 'mac': MAC, 'signature': SIGN, 'cert': self.cert.public_bytes(encoding = serialization.Encoding.PEM), 'sessionid': self.sessionid.bytes})
+        req = requests.post(f'{self.SERVER_URL}/api/renew', data = data, headers = headers)
         # Process server response
         reqResp = self.processResponse(request = req)
         if req.status_code != 200:
@@ -379,9 +378,9 @@ class MediaClient:
         --- Returns
         success         Boolean
         """
-        data, MIC, MAC, SIGN  = self.cipher({"close": True})
+        data, headers  = self.cipher({"close": True})
         # POST to server
-        req = requests.post(f'{self.SERVER_URL}/api/sessionend', data = data, headers = {'mic': MIC, 'mac': MAC, 'signature': SIGN, 'cert': self.cert.public_bytes(encoding = serialization.Encoding.PEM), 'sessionid': self.sessionid.bytes})
+        req = requests.post(f'{self.SERVER_URL}/api/sessionend', data = data, headers = headers)
         # Process server response
         reqResp = self.processResponse(request = req)
         if req.status_code != 200:
@@ -421,9 +420,7 @@ class MediaClient:
         jsonobj         A JSON parsable python object to encode
         --- Returns
         cryptogram      bytes
-        MIC 
-        MAC
-        SIGN            The signature with the client private key
+        headers         dict() with validation headers (MIC, MAC, SIGN, session info and cert)
         """
         message = json.dumps(jsonobj).encode()
         print("JSON to STR", message)
@@ -441,9 +438,19 @@ class MediaClient:
         print("Generated MIC:\n",MIC)
         MAC = CryptoFunctions.create_digest(cryptogram+self.shared_key, self.DIGEST).strip()
         print("\nGenerated MAC:\n", MAC)
+        
         SIGN = CryptoFunctions.signingRSA(cryptogram, self.cert_private_key)
+        print("\nGenerated SIGN:\n", SIGN)
 
-        return cryptogram, MIC, MAC, SIGN
+        headers = {
+            'mic': MIC, 
+            'mac': MAC, 
+            'signature': base64.b64encode(SIGN), 
+            'cert': base64.b64encode(self.cert.public_bytes(encoding = serialization.Encoding.PEM)), 
+            'sessionid': self.sessionid.bytes
+        }
+
+        return cryptogram, headers
     
     # Response
     def processResponse(self, request, append=None, ciphered=True):
@@ -498,6 +505,7 @@ class MediaClient:
             return None
         else:
             print("\nThe server certificate is valid!")
+        # TODO Validate signature!
         # Check if response is ciphered
         if not ciphered:
             print("\nResponse is not ciphered!")

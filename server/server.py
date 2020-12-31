@@ -7,6 +7,7 @@ import json
 import os
 import math
 import uuid
+import base64
 from aux_functions import *
 
 # Serialization
@@ -692,11 +693,17 @@ class MediaServer(resource.Resource):
         print("\nProcessing request...")
 
         headers = request.getAllHeaders()
-        # Validate certificate
-        print("\nGot Certificate and Signature...")
-        print(headers[b'signature'])
-        print(headers[b'cert'])
 
+        # Validate certificate and request signature
+        print("\nGot Certificate and Signature...")
+        # print(headers[b'signature'])
+        cert =  base64.b64decode(headers[b'cert']).decode('latin')
+        print("\nCert is...\n", cert)
+        if not self.pki.validateCerts(cert, [], pem=True):
+            print("ERROR! The server certificate is not valid!")
+            return None, None
+        else:
+            print("\nThe server certificate is valid!")
 
         # Get session and validate it
         session = self.getSession(request)
