@@ -633,8 +633,8 @@ class MediaServer(resource.Resource):
         SIGN = CryptoFunctions.signingRSA(cryptogram, self.private_key)
         print("\nGenerated signature:\n", SIGN)
         # Add headers
-        request.responseHeaders.addRawHeader(b"mic", MIC)
-        request.responseHeaders.addRawHeader(b"mac", MAC)
+        request.responseHeaders.addRawHeader(b"mic", base64.b64encode(MIC))
+        request.responseHeaders.addRawHeader(b"mac", base64.b64encode(MAC))
         request.responseHeaders.addRawHeader(b"signature", base64.b64encode(SIGN))
         request.responseHeaders.addRawHeader(b"certificate", base64.b64encode(self.cert.public_bytes(encoding = serialization.Encoding.PEM)))
         request.responseHeaders.addRawHeader(b"ciphered", b"True")
@@ -668,7 +668,7 @@ class MediaServer(resource.Resource):
         SIGN = CryptoFunctions.signingRSA(message, self.private_key)
         print("\nGenerated signature:\n", SIGN)
         # Add headers
-        request.responseHeaders.addRawHeader(b"mic", MIC)
+        request.responseHeaders.addRawHeader(b"mic", base64.b64encode(MIC))
         request.responseHeaders.addRawHeader(b"signature", base64.b64encode(SIGN))
         request.responseHeaders.addRawHeader(b"certificate", base64.b64encode(self.cert.public_bytes(encoding = serialization.Encoding.PEM)))
         request.responseHeaders.addRawHeader(b"ciphered", b'False')

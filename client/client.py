@@ -483,18 +483,15 @@ class MediaClient:
 
         # Validate MIC
         if ciphered:
-            print("\nGot MIC...\n", request.headers['Mic'].encode('latin'))
             MIC = CryptoFunctions.create_digest(request.content.strip(), self.DIGEST)
-            print("\nMIC computed...\n", MIC)
-            if MIC != request.headers['Mic'].encode('latin'):
+            if MIC != base64.b64decode(request.headers['Mic']):
                 print("INVALID MIC!")
                 return None
             else:
                 print("Validated MIC!")
             
-            print("\nGot MAC...\n", request.headers['Mac'].encode('latin'))
             MAC = CryptoFunctions.create_digest(request.content.strip() + self.shared_key, self.DIGEST)
-            if MAC != request.headers['Mac'].encode('latin'):
+            if MAC != base64.b64decode(request.headers['Mac']):
                 print("INVALID MAC!")
                 return None
             else:
