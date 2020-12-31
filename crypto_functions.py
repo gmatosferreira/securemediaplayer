@@ -10,6 +10,12 @@ from cryptography.fernet import Fernet
 
 class CryptoFunctions:
 
+    suites = [
+        'AES / CBC / SHA512',
+        'AES / OFB / SHA512',
+        '3DES / CBC / BLAKE2',
+        '3DES / OFB / BLAKE2',
+    ]
     digests = ['SHA512', 'BLAKE2']
 
     """
@@ -24,37 +30,6 @@ class CryptoFunctions:
         # Create a public key
         public = private.public_key()
         return private, public
-
-    """
-    This method creates a criptogram for a message ciphered with a public key
-    --- Parameteres
-    key             The key to cipher with
-    message         The text to cipher
-    algorithm       The algorithm to cipher with
-    --- Returns
-    criptogram      The text ciphered
-    """
-    @staticmethod
-    def assymetric_encryption(key, message, algorithm=hashes.SHA256):
-        return key.encrypt(
-            message,
-            padding.OAEP(
-                mgf = padding.MGF1(algorithm=hashes.SHA256()),
-                algorithm = hashes.SHA256(),
-                label = None
-            )
-        )
-
-    @staticmethod
-    def assymetric_decryption(key, cryptogram, algorithm=hashes.SHA256):
-        return key.decrypt(
-            cryptogram,
-            padding.OAEP(
-                mgf = padding.MGF1(algorithm=algorithm()),
-                algorithm = algorithm(),
-                label = None
-            )
-        )
 
     """
     This method checks and applys a digest function to a given message
@@ -78,23 +53,6 @@ class CryptoFunctions:
         
         return digest.finalize()
 
-    @staticmethod
-    def create_mac(message, key, digst_algorithm):
-        
-        hash_algorithm = None
-
-        if digst_algorithm == "SHA512":
-            hash_algorithm = hashes.SHA512()
-        elif digst_algorithm == "BLAKE2":
-            hash_algorithm = hashes.BLAKE2b(64)
-        else:
-            raise Exception("Digest Algorithm name not founded!")
-
-        mac = hmac.HMAC(key, digst_algorithm, backend=default_backend())
-        mac.update(message)
-        
-        return mac.finalize()
-
     """
     This method handles symetric encryption/decription
     --- Parameters
@@ -110,23 +68,19 @@ class CryptoFunctions:
     @staticmethod
     def symetric_encryption(key,message, algorithm_name, cypher_mode, digest_mode, encode=True ):
 
-        # If key length does not match expected, create digest for it
-        print(f"\nSymetric encription with key of size {len(key)*8}...")
-        if len(key)*8 != 256:
-            key = CryptoFunctions.create_digest(key, digest_mode)
-        print(f"Symetric encription with key of size {len(key)*8}...")
-
         # Define algorithm
         algorithm = None
         blockLength = 0
         iv = None
 
         if algorithm_name == "AES":
+            key = CryptoFunctions.validateKey(key, digest_mode, 256)
             algorithm = algorithms.AES(key)
             # Divide by 8 because it returns size on bits and we want on bytes (8 bits)
             blockLength = algorithms.AES.block_size // 8
             
         elif algorithm_name == "3DES":
+            key = CryptoFunctions.validateKey(key, digest_mode, 192)
             algorithm = algorithms.TripleDES(key[:24])
             blockLength = algorithm.block_size // 8
             
@@ -196,6 +150,21 @@ class CryptoFunctions:
             print(f"Decripted to\n{criptograma}")
         
         return criptograma
+
+    @staticmethod
+    def validateKey(key, digest_mode, size):
+        """
+        This method makes a key suitable for requested size
+        If it does not have that size, a digest is created
+        - Parameteres
+        key             bytes
+        digest_mode     String
+        size            Number of bits
+        """
+        # If key length does not match expected, create digest for it
+        if len(key)*8 != size:
+            return CryptoFunctions.create_digest(key, digest_mode)
+        return key        
 
     @staticmethod
     def signingRSA(message, private_key):
