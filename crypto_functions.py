@@ -10,7 +10,9 @@ from cryptography.fernet import Fernet
 
 class CryptoFunctions:
 
+    ciphers = ['AES', '3DES']
     digests = ['SHA512', 'BLAKE2']
+    modes = ['CBC', 'OFB']
 
     """
     This method handles the creation of private/public keys pair
@@ -68,11 +70,13 @@ class CryptoFunctions:
         iv = None
 
         if algorithm_name == "AES":
+            key = CryptoFunctions.validateKey(key, digest_mode, 256)
             algorithm = algorithms.AES(key)
             # Divide by 8 because it returns size on bits and we want on bytes (8 bits)
             blockLength = algorithms.AES.block_size // 8
             
         elif algorithm_name == "3DES":
+            key = CryptoFunctions.validateKey(key, digest_mode, 192)
             algorithm = algorithms.TripleDES(key[:24])
             blockLength = algorithm.block_size // 8
             
@@ -142,6 +146,21 @@ class CryptoFunctions:
             print(f"Decripted to\n{criptograma}")
         
         return criptograma
+
+    @staticmethod
+    def validateKey(key, digest_mode, size):
+        """
+        This method makes a key suitable for requested size
+        If it does not have that size, a digest is created
+        - Parameteres
+        key             bytes
+        digest_mode     String
+        size            Number of bits
+        """
+        # If key length does not match expected, create digest for it
+        if len(key)*8 != size:
+            return CryptoFunctions.create_digest(key, digest_mode)
+        return key        
 
     @staticmethod
     def signingRSA(message, private_key):
