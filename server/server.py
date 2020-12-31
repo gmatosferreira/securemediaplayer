@@ -108,14 +108,9 @@ class MediaServer(resource.Resource):
 
     # Send the list of available protocols
     def do_choose_protocols(self, request):
-        protocols = {
-            'cipher': CryptoFunctions.ciphers, 
-            'digests': CryptoFunctions.digests, 
-            'cipher_mode': CryptoFunctions.modes
-        }
         return self.rawResponse(
             request = request,
-            response = protocols
+            response = CryptoFunctions.suites
         )
 
 

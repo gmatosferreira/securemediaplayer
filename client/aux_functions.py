@@ -13,65 +13,34 @@ from cryptography.hazmat.primitives import serialization
 This method lets the user define the protocols to use.
 It returns the cipher suite.
 """
-def client_chosen_options(protocols):
-    # Cipher choice
-    while True:
-        # Show options
-        print("\nChoose a cipher algorithm: ")
-        i=1
-        for cipher in protocols['cipher']:
-            print(i, ")",cipher)
-            i+=1
-        # Receive input
-        print("> " , end =" ")
-        op = input()
-        if op.isdigit():
-            op = int(op)
-            if op >= 1 and op <= len(protocols['cipher']):
-                cipher = protocols['cipher'][op-1]
-                break
-        print("That is not a valid option! Try again!")
+def client_chosen_options(suites):
+    """
+    Given a list of suites, returns the chipher suite choosen
+    """
+    # Print available suites
+    print("\nThe available cipher suites are...")
+    print(f"\n{'Number':10}  {'Cipher alg':30}  {'Cipher mode':30}  {'Digest':30}")
+    counter = 0
+    for s in suites:
+        s = s.split(" / ")
+        print(f"{counter:<10}  {s[0]:30}  {s[1]:30}  {s[2]:30}")
+        counter += 1
     
-    # Digest choice
+    # Let user choose  
     while True:
-        # Show options
-        print("\nChoose a digest: ")
-        i=1
-        for digest in protocols['digests']:
-            print(i, ")",digest)
-            i+=1
-        # Receive input
-        print("> " , end =" ")
+        print("\nWhat suite do you choose? ", end="")
         op = input()
         if op.isdigit():
             op = int(op)
-            if op >= 1 and op <= len(protocols['digests']):
-                digest = protocols['digests'][op-1]
+            if op >= 0 and op < len(suites):
+                suite = suites[op]
                 break
         print("That is not a valid option! Try again!")
 
-    # Cipher mode choice
-    while True: 
-        # Show options
-        print("\nChoose a cipher mode: ")
-        i=1
-        for mode in protocols['cipher_mode']:
-            print(i, ")",mode)
-            i+=1
-        # Receive input
-        print("> " , end =" ")
-        op = input()
-        if op.isdigit():
-            op = int(op)
-            if op >= 1 and op <= len(protocols['cipher_mode']):
-                cipher_mode = protocols['cipher_mode'][op-1]
-                break
-        print("That is not a valid option! Try again!")
-
-    cipherSuite = {'cipher': cipher, 'digest': digest, 'cipher_mode':cipher_mode}
-    
+    suite = suite.split(" / ")
+    cipherSuite = {'cipher': suite[0], 'cipher_mode':suite[1], 'digest': suite[2]}
     return cipherSuite
-
+        
 """
 def user_logout(self):
     requests.post(f'{self.SERVER_URL}/api/update_license', data = {"username": self.username})

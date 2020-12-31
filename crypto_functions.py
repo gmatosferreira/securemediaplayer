@@ -10,9 +10,12 @@ from cryptography.fernet import Fernet
 
 class CryptoFunctions:
 
-    ciphers = ['AES', '3DES']
-    digests = ['SHA512', 'BLAKE2']
-    modes = ['CBC', 'OFB']
+    suites = [
+        'AES / CBC / SHA512',
+        'AES / OFB / SHA512',
+        '3DES / CBC / BLAKE2',
+        '3DES / OFB / BLAKE2',
+    ]
 
     """
     This method handles the creation of private/public keys pair
