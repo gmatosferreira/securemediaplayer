@@ -199,10 +199,12 @@ class CryptoFunctions:
 
     @staticmethod
     def signingRSA(message, private_key):
+        print("\nSIGNING...", message)
         signature = private_key.sign(
             message,
             padding.PSS(
-                mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH
+                mgf=padding.MGF1(hashes.SHA256()), 
+                salt_length=padding.PSS.MAX_LENGTH
             ),
             hashes.SHA256(),
         )
@@ -210,17 +212,24 @@ class CryptoFunctions:
 
     @staticmethod
     def validacaoAssinatura_RSA(signature, message, public_key):
+        """
+        Valida assinatura
+        param: signature        Bytes
+        param: message          Bytes
+        param: public_key       Public Key
+        """
+        print("\nVALIDATING SIGNATURE OF...", message)
         try:
             public_key.verify(
                 signature,
                 message,
                 padding.PSS(
-                    mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH
+                    mgf=padding.MGF1(hashes.SHA256()), 
+                    salt_length=padding.PSS.MAX_LENGTH
                 ),
                 hashes.SHA256(),
             )
         except:
-            print("erro ao verificar a assinatura")
             return False
 
         return True

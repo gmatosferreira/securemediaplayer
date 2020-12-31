@@ -72,6 +72,9 @@ class MediaClient:
         if req.status_code != 200:
             self.responseError(req, data)
             exit()
+        elif not data:
+            print("Couldn't get parameters from server... :/")
+            exit()
         self.parameters = serialization.load_pem_parameters(bytes(data['parameters'], 'utf-8'))   
         print("\nGot parameters\n", self.parameters)
 
@@ -467,6 +470,7 @@ class MediaClient:
         if not request.content: return None
         print("\n# Deciphering request...\n", request.content.strip())
         print("\nHeaders:\n", request.headers)
+
         # Check if response is ciphered
         if 'ciphered' not in request.headers.keys() or request.headers['ciphered'] == 'False':
             print("\nIt is not ciphered!")
@@ -476,6 +480,7 @@ class MediaClient:
         elif not ciphered:
             print("\nExpecting not ciphered response, but it is ciphered!")
             return None
+
         # Validate MIC
         if ciphered:
             print("\nGot MIC...\n", request.headers['Mic'].encode('latin'))
@@ -498,14 +503,16 @@ class MediaClient:
             print("\nIgnoring MIC for now...")
             # print("\nGot MIC (hash)...\n", request.headers['Mic'])
             # MIC = str(request.content.strip()).__hash__()
-        # Validate certificate and signature
+        
+        # Validate certificate
         cert = base64.b64decode(request.headers['Certificate']).decode('latin')
         if not self.pki.validateCerts(cert, [], pem=True):
-            print("ERROR! The server certificate is not valid!")
+            print("\nERROR! The server certificate is not valid!")
             return None
         else:
             print("\nThe server certificate is valid!")
         # TODO Validate signature!
+
         # Check if response is ciphered
         if not ciphered:
             print("\nResponse is not ciphered!")

@@ -635,8 +635,8 @@ class MediaServer(resource.Resource):
         # Add headers
         request.responseHeaders.addRawHeader(b"mic", MIC)
         request.responseHeaders.addRawHeader(b"mac", MAC)
-        request.responseHeaders.addRawHeader(b"signature", SIGN)
-        request.responseHeaders.addRawHeader(b"certificate", self.cert.public_bytes(encoding = serialization.Encoding.PEM))
+        request.responseHeaders.addRawHeader(b"signature", base64.b64encode(SIGN))
+        request.responseHeaders.addRawHeader(b"certificate", base64.b64encode(self.cert.public_bytes(encoding = serialization.Encoding.PEM)))
         request.responseHeaders.addRawHeader(b"ciphered", b"True")
         request.responseHeaders.addRawHeader(b"content-type", b"application/json")
         if error:
