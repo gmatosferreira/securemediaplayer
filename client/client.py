@@ -65,8 +65,9 @@ class MediaClient:
         fc.close()
         print("\nLoaded certificate...\n", self.cert)
 
-        # 1. Get DH parameters from server 
-        req = requests.get(f'{self.SERVER_URL}/api/parameters')
+        # 1. Get DH parameters from server
+        _, headers = self.processRequest({}, cipher=False)
+        req = requests.get(f'{self.SERVER_URL}/api/parameters', headers = headers)
         data = self.processResponse(
             request = req,
             ciphered = False
@@ -110,7 +111,8 @@ class MediaClient:
         """
         # 1. Let user choose chipher suite
         # 1.1. Ask server for available protocols 
-        req = requests.get(f'{self.SERVER_URL}/api/protocols')            
+        _, headers = self.processRequest({}, cipher=False)
+        req = requests.get(f'{self.SERVER_URL}/api/protocols', headers = headers)            
         data = self.processResponse(
             request = req,
             ciphered = False
@@ -242,7 +244,7 @@ class MediaClient:
                 payload['signcert'] = cc.cert.public_bytes(serialization.Encoding.DER).decode('latin')
                 payload['intermedium'] = [c.public_bytes(serialization.Encoding.DER).decode('latin') for c in cc.intermedium]
                 print("\nEncoded CC public key...\n", payload['signcert'])
-            data, headers  = self.cipher(payload)
+            data, headers  = self.processRequest(payload)
             # POST to server
             req = requests.post(url, data = data, headers = headers)
             # Process server response
@@ -265,7 +267,9 @@ class MediaClient:
         """
         # 1. Get a list of media files
         print("Contacting Server...")
-        req = requests.get(f'{SERVER_URL}/api/list', headers = {'sessionid': base64.b64encode(self.sessionid.bytes)})
+        _, headers = self.processRequest({}, cipher=False)
+        headers ['sessionid'] = base64.b64encode(self.sessionid.bytes)
+        req = requests.get(f'{SERVER_URL}/api/list', headers = headers)
         reqResp = self.processResponse(req)
         if req.status_code != 200:
             self.responseError(req, reqResp)
@@ -312,7 +316,7 @@ class MediaClient:
 
             # Make request until gets a valid answer (max 5 times)
             for i in range(0,5):
-                data, headers  = self.cipher({"media": media_item["id"], "chunk": chunk})
+                data, headers  = self.processRequest({"media": media_item["id"], "chunk": chunk})
                 # POST to server
                 req = requests.post(f'{self.SERVER_URL}/api/download', data = data, headers = headers)
                 media = self.processResponse(req, bytes(chunk))
@@ -344,7 +348,7 @@ class MediaClient:
         """
         This method handles the client log out at server
         """
-        data, headers  = self.cipher({"logout": True})
+        data, headers  = self.processRequest({"logout": True})
         # POST to server
         req = requests.post(f'{self.SERVER_URL}/api/auth', data = data, headers = headers)
         # Process server response
@@ -359,7 +363,9 @@ class MediaClient:
         """
         This method allows the client to look up his license status
         """
-        req = requests.get(f'{SERVER_URL}/api/license', headers = {'sessionid': base64.b64encode(self.sessionid.bytes)})
+        _, headers = self.processRequest({}, cipher=False)
+        headers['sessionid'] = base64.b64encode(self.sessionid.bytes)
+        req = requests.get(f'{SERVER_URL}/api/license', headers = headers)
         reqResp = self.processResponse(req)
         if req.status_code != 200:
             self.responseError(req, reqResp)
@@ -372,7 +378,7 @@ class MediaClient:
         """
         This method allows the client to renew his certificate with the server
         """
-        data, headers  = self.cipher({"renew": True})
+        data, headers  = self.processRequest({"renew": True})
         # POST to server
         req = requests.post(f'{self.SERVER_URL}/api/renew', data = data, headers = headers)
         # Process server response
@@ -390,7 +396,7 @@ class MediaClient:
         --- Returns
         success         Boolean
         """
-        data, headers  = self.cipher({"close": True})
+        data, headers  = self.processRequest({"close": True})
         # POST to server
         req = requests.post(f'{self.SERVER_URL}/api/sessionend', data = data, headers = headers)
         # Process server response
@@ -424,44 +430,52 @@ class MediaClient:
     # Secrecy
 
     # Cipher
-    def cipher(self, jsonobj):
+    def processRequest(self, jsonobj, cipher=True):
         """
-        This method ciphers a request payload
+        This method processes a request payload before making request
         It also generates a MIC for the cryptogram
+        If cipher, ciphers payload and generates MAC
         --- Parameters
         jsonobj         A JSON parsable python object to encode
+        cipher          Boolean
         --- Returns
-        cryptogram      bytes
+        data            the request data (encoded or not)
         headers         dict() with validation headers (MIC, MAC, SIGN, session info and cert)
         """
-        message = json.dumps(jsonobj).encode()
-        print("JSON to STR", message)
+        message = json.dumps(jsonobj).encode('latin')
 
-        cryptogram = CryptoFunctions.symetric_encryption(
-            key = self.shared_key,
-            message = message,
-            algorithm_name = self.CIPHER,
-            cypher_mode = self.CIPHERMODE,
-            digest_mode = self.DIGEST,
-            encode = True
-        )
+        if cipher:
+            cryptogram = CryptoFunctions.symetric_encryption(
+                key = self.shared_key,
+                message = message,
+                algorithm_name = self.CIPHER,
+                cypher_mode = self.CIPHERMODE,
+                digest_mode = self.DIGEST,
+                encode = True
+            )
+        else:
+            cryptogram = message
 
-        MIC = CryptoFunctions.create_digest(cryptogram, self.DIGEST).strip()
-        print("Generated MIC:\n",MIC)
-        MAC = CryptoFunctions.create_digest(cryptogram+self.shared_key, self.DIGEST).strip()
-        print("\nGenerated MAC:\n", MAC)
+        if cipher:
+            MIC = CryptoFunctions.create_digest(cryptogram, self.DIGEST).strip()
+            print("Generated MIC:\n",MIC)
+            MAC = CryptoFunctions.create_digest(cryptogram+self.shared_key, self.DIGEST).strip()
+            print("\nGenerated MAC:\n", MAC)
         
         SIGN = CryptoFunctions.signingRSA(cryptogram, self.cert_private_key)
         print("\nGenerated SIGN:\n", SIGN)
         print("\nContent signed:\n", cryptogram)
 
         headers = {
-            'mic': base64.b64encode(MIC), 
-            'mac': base64.b64encode(MAC), 
-            'signature': base64.b64encode(SIGN), 
-            'cert': base64.b64encode(self.cert.public_bytes(encoding = serialization.Encoding.PEM)), 
-            'sessionid': base64.b64encode(self.sessionid.bytes)
+            'signature': base64.b64encode(SIGN),
+            'cert': base64.b64encode(self.cert.public_bytes(encoding = serialization.Encoding.PEM)),
+            'ciphered': str(cipher)
         }
+
+        if cipher:
+            headers['mac'] = base64.b64encode(MAC)
+            headers['mic'] = base64.b64encode(MIC)
+            headers['sessionid'] = base64.b64encode(self.sessionid.bytes)
 
         return cryptogram, headers
     

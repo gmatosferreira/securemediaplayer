@@ -94,6 +94,12 @@ class MediaServer(resource.Resource):
 
     # Send the server DH parameters
     def do_parameters(self, request):
+        # Validate client certificate
+        if not self.processRequestCertificate(request):
+            return self.rawResponse(
+                request = request,
+                response = {'error': 'The client certificate is not valid!'}
+            )
         # Convert parameters to bytes
         pr = self.parameters.parameter_bytes(
             encoding = serialization.Encoding.PEM,
@@ -108,6 +114,13 @@ class MediaServer(resource.Resource):
 
     # Send the list of available protocols
     def do_choose_protocols(self, request):
+        # Validate client certificate
+        if not self.processRequestCertificate(request):
+            return self.rawResponse(
+                request = request,
+                response = {'error': 'The client certificate is not valid!'}
+            )
+        # Return protocols available
         return self.rawResponse(
             request = request,
             response = CryptoFunctions.suites
@@ -116,11 +129,12 @@ class MediaServer(resource.Resource):
 
     # Send the list of media files to clients
     def do_list(self, request):
-
-        #auth = request.getHeader('Authorization')
-        #if not auth:
-        #    request.setResponseCode(401)
-        #    return 'Not authorized'
+        # Validate client certificate
+        if not self.processRequestCertificate(request):
+            return self.rawResponse(
+                request = request,
+                response = {'error': 'The client certificate is not valid!'}
+            )
         
         # Validate session and log in
         invalid, session = self.invalidSession(request)
@@ -158,6 +172,13 @@ class MediaServer(resource.Resource):
         """
         This method allows the client to look up his license status
         """
+        # Validate client certificate
+        if not self.processRequestCertificate(request):
+            return self.rawResponse(
+                request = request,
+                response = {'error': 'The client certificate is not valid!'}
+            )
+            
         # Validate session and log in
         invalid, session = self.invalidSession(request)
         if invalid: return invalid
@@ -679,24 +700,8 @@ class MediaServer(resource.Resource):
         headers = request.getAllHeaders()
 
         # Validate certificate and request signature
-        print("\nGot Certificate and Signature...")
-        # print(headers[b'signature'])
-        cert =  base64.b64decode(headers[b'cert']).decode('latin')
-        print("\nCert is...\n", cert)
-        if not self.pki.validateCerts(cert, [], pem=True):
-            print("ERROR! The server certificate is not valid!")
+        if not self.processRequestCertificate(request):
             return None, None
-        else:
-            print("\nThe server certificate is valid!")
-
-        # Validate signature!
-        cert = self.pki.getCertFromString(cert, pem=True) 
-        sign = base64.b64decode(headers[b'signature']) 
-        if not CryptoFunctions.validacaoAssinatura_RSA(sign, request.content.getvalue(), cert.public_key()):
-            print("\nERROR! The client signature is not valid!")
-            return None, None
-        else: 
-            print("\nThe client signature is valid! :)") 
 
         # Get session and validate it
         session = self.getSession(request)
@@ -704,7 +709,6 @@ class MediaServer(resource.Resource):
             return None, None
         
         # Get MIC and validate it
-        
         RMIC = base64.b64decode(headers[b'mic'])
         print("\nGot MIC...\n", RMIC)
         MIC = CryptoFunctions.create_digest(request.content.getvalue().strip(), session['digest']).strip()
@@ -736,6 +740,36 @@ class MediaServer(resource.Resource):
             encode = False 
         ) 
         return session, json.loads(message)
+
+    # Process client certificates
+    def processRequestCertificate(self, request):
+        """
+        This method validates the client certificates for a request
+        --- Returns
+        certificate valid       boolean
+        """
+        headers = request.getAllHeaders()
+
+        # Validate certificate
+        print("\nGot Certificate and Signature...")
+        cert =  base64.b64decode(headers[b'cert']).decode('latin')
+        print("\nCert is...\n", cert)
+        if not self.pki.validateCerts(cert, [], pem=True):
+            print("ERROR! The server certificate is not valid!")
+            return False
+        else:
+            print("\nThe server certificate is valid!")
+
+        # Validate signature!
+        cert = self.pki.getCertFromString(cert, pem=True) 
+        sign = base64.b64decode(headers[b'signature']) 
+        signMessage = request.content.getvalue() if request.content.getvalue() else json.dumps(dict()).encode('latin')
+        if not CryptoFunctions.validacaoAssinatura_RSA(sign, signMessage, cert.public_key()):
+            print("\nERROR! The client signature is not valid!")
+            return False
+        else: 
+            print("\nThe client signature is valid! :)") 
+        return True        
 
     # Session management
     def getSession(self, request):
