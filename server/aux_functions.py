@@ -31,20 +31,6 @@ def register(server, username, password, signature, signcert, intermedium):
     print("\nREGISTER")
     if not username or not password: return None, "There are attributes missing!"
 
-    # Load users
-    usersfile = server.getFile('./licenses.json')
-    if not usersfile:
-        users = []
-    else:
-        users = json.loads(usersfile)
-        print("Got users", [u['username'] for u in users])
-
-    # Check that user is not registered yet
-    for u in users:
-        if u['username'] == username:
-            print("ERROR! User already exists!")
-            return None, "The username given is already being used! Please choose other."
-
     # Validate certificate
     print("\nVALIDATING SIGNATURE CERTIFICATE...")
     if not server.pki.validateCerts(signcert, intermedium):
@@ -64,6 +50,20 @@ def register(server, username, password, signature, signcert, intermedium):
     print("\nValidating signature...", valid)
     if not valid:
         return None, "The signature is not valid!"
+
+    # Load users
+    usersfile = server.getFile('./licenses.json')
+    if not usersfile:
+        users = []
+    else:
+        users = json.loads(usersfile)
+        print("Got users", [u['username'] for u in users])
+
+    # Check that user is not registered yet
+    for u in users:
+        if u['username'] == username:
+            print("ERROR! User already exists!")
+            return None, "The username given is already being used! Please choose other."
 
     # Create user
     user = {
