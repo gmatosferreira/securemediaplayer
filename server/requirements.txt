@@ -2,3 +2,4 @@ requests
 twisted
 cryptography
 
+PyKCS11
