@@ -24,3 +24,11 @@ The code for this project was developed in Python, with the library [Cryptograph
 ### Report
 
 The report is available (in Portuguese) [here](report.pdf).
+
+
+
+## Authors
+
+[Gonçalo Matos](https://github.com/gmatosferreira)
+
+[Alexandre Rodrigues](https://github.com/alex-pt01)
