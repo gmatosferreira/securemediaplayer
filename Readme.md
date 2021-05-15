@@ -1,6 +1,6 @@
 # Digital rights management
 
-This project was developed in the context of [Information And Organisational Security](https://www.ua.pt/en/uc/4143) curricular unit, part of the Computer Science Bachelor at [Aveiro University](https://www.ua.pt/). It was lectured by [João Paulo Silva Barraca](https://www.ua.pt/en/p/10333322).
+This project was developed in the context of [Information And Organisational Security](https://www.ua.pt/en/uc/4143) curricular unit, part of the Computer Science Bachelor at [Aveiro University](https://www.ua.pt/). It was lectured by [João Paulo Silva Barraca](https://www.ua.pt/en/p/10333322) during the 2020/2021 school year.
 
 It was graded **18 out of 20**.
 
@@ -29,6 +29,6 @@ The report is available (in Portuguese) [here](report.pdf).
 
 ## Authors
 
-[Gonçalo Matos](https://github.com/gmatosferreira)
-
 [Alexandre Rodrigues](https://github.com/alex-pt01)
+
+[Gonçalo Matos](https://github.com/gmatosferreira)
